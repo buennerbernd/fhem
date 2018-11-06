@@ -9,7 +9,7 @@ package main;
 
 use strict;
 use warnings;
-#use DevIo; # load DevIo.pm if not already loaded
+use DevIo; # load DevIo.pm if not already loaded
 use Data::Dumper;
 
 # called upon loading the module KLF200
@@ -221,7 +221,10 @@ sub KLF200_Write($$) {
 sub KLF200_DispatchToNode($$) {
 	my ($hash, $bytes) = @_;
 	my $found = Dispatch($hash, $bytes);
-  Debug("found: " . Dumper $found);
+	if (not defined($found)) {
+    RemoveInternalTimer($hash, "KLF200_GW_GET_ALL_NODES_INFORMATION_REQ");
+    InternalTimer( gettimeofday() + 20, "KLF200_GW_GET_ALL_NODES_INFORMATION_REQ", $hash); #after auto create, update node again in 20 seconds
+	};
 	return;
 }
 
