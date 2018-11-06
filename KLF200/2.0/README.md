@@ -6,6 +6,8 @@ Module 83_KLF200.pm represents the KLF200 box.
 
 Module 83_KLF200Node.pm represents the devices, managed by the KLF200 box.
 
+Copy both ih the folder /opt/fhem/FHEM/ and restart FHEM.
+
 Define
 
     define <name> KLF200 <host> <pwfile>
