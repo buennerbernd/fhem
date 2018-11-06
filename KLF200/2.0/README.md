@@ -15,7 +15,7 @@ Define
         
 The devices will be created by auto create as instances of KLF200Node.
 
-The device name of the nodes will be <name>_<NodeID>, but the names from the KLF200 Web UI will be set as alias.
+The device name of the nodes will be name_NodeID, but the names from the KLF200 Web UI will be set as alias.
   
 Attributes
 
