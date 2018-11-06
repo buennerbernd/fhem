@@ -4,7 +4,7 @@ https://www.velux.com/api/klf200
 
 Module 83_KLF200.pm represents the KLF200 box.
 
-Module 83_KLF200Node.pm represents the devices, managed by the KLF200 box.Define
+Module 83_KLF200Node.pm represents the devices, managed by the KLF200 box.
 
 Define
 
@@ -19,4 +19,4 @@ The device name of the nodes will be name_NodeID, but the names from the KLF200 
   
 Attributes
 
-  directionOn: up/down (default is up) Defines the meaning of on, off, 100%, 0%. The might depend on the device type.
+    directionOn: up/down (default is up) Defines the meaning of on, off, 100%, 0%. This might depend on the device type and personal preferences.
