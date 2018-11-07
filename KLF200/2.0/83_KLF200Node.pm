@@ -258,10 +258,10 @@ sub KLF200Node_PctToRaw($$) {
 	my $raw;
 	my $directionOn = AttrVal($name, "directionOn", "up");
   if ($directionOn eq "up") { 
-    $raw = int(100 - ($pct * 512)); 
+    $raw = int((100 - $pct) * 512); 
   }
   else { 
-    $raw = $pct * 512; 
+    $raw = int($pct * 512); 
   }	
   return $raw;
 }
