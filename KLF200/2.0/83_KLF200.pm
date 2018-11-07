@@ -49,6 +49,7 @@ sub KLF200_Define($$) {
   $dev .= ':51200' if(not $dev =~ m/:\d+$/);
   $hash->{DeviceName} = $dev;
   $hash->{SSL} = 1;
+  $hash->{TIMEOUT} = 10; #default is 3
   
   my $pwfile = $a[3]; 
   $hash->{"pwfile"}= $pwfile;
