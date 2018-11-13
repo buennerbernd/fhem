@@ -41,12 +41,12 @@ sub KLF200Node_Define($$) {
 	# Adresse rückwärts dem Hash zuordnen (für ParseFn)
 	$modules{KLF200Node}{defptr}{$DeviceName}{$NodeID} = $hash;
 
-  KLF200Node_InitConst($hash);
+  KLF200Node_InitTexts($hash);
   
   return undef;
 }
 
-sub KLF200Node_InitConst($) {
+sub KLF200Node_InitTexts($) {
   my ($hash) = @_;
    
   $hash->{Const}->{OperatingState} = {
@@ -160,6 +160,16 @@ sub KLF200Node_InitConst($) {
    
   return;
 }
+
+sub KLF200Node_GetText($$$) {
+  my ($hash, $const, $id) = @_;
+  
+  my $text = $hash->{Const}->{$const}->{$id};
+  if (not defined($text)) {return $id};
+  
+  return $text;
+}
+
 sub KLF200Node_Undef($$) {
   my ($hash, $arg) = @_; 
 	my $NodeID = $hash->{NodeID};
@@ -313,14 +323,14 @@ sub KLF200Node_GW_COMMAND_RUN_STATUS_NTF($$) {
 	my $name = $hash->{NAME};
 	Log3($hash, 5, "KLF200Node ($name) GW_COMMAND_RUN_STATUS_NTF $commandHex $SessionID $StatusID $NodeID $NodeParameter = $ParameterValue $RunStatus $StatusReply $InformationCode");
 	
-	my $RunStatusStr = $hash->{Const}->{RunStatus}->{$RunStatus};
-	my $StatusReplyStr = $hash->{Const}->{StatusReply}->{$StatusReply};
+	my $RunStatusStr = "Session ". $SessionID . ": " . KLF200Node_GetText($hash, "RunStatus", $RunStatus);
+	my $StatusReplyStr = "Session ". $SessionID . ": " . KLF200Node_GetText($hash, "StatusReply", $StatusReply);
 	readingsBeginUpdate($hash);
 	if ($NodeParameter == 0) { #MP: Main Parameter
 		KLF200Node_BulkUpdateStatePtc($hash, $ParameterValue);
 	};
-	readingsBulkUpdateIfChanged($hash, "runStatus", $RunStatusStr, 1) if (defined($RunStatusStr));
-	readingsBulkUpdateIfChanged($hash, "statusReply", $StatusReplyStr, 1) if (defined($StatusReplyStr));
+	readingsBulkUpdateIfChanged($hash, "runStatus", $RunStatusStr, 1);
+	readingsBulkUpdateIfChanged($hash, "statusReply", $StatusReplyStr, 1);
 	if ($RunStatus != 2){
 		readingsBulkUpdateIfChanged($hash, "remaining", 0, 1);
 	}
@@ -359,13 +369,13 @@ sub KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($$) {
   if (not defined($hash)) {return $undefined};
 
 	my $name = $hash->{NAME};
-	my $OperatingState = $hash->{Const}->{OperatingState}->{$State};
+	my $OperatingState = KLF200Node_GetText($hash, "OperatingState", $State);
 	Log3($hash, 5, "KLF200Node ($name) GW_NODE_STATE_POSITION_CHANGED_NTF $commandHex $NodeID $State $CurrentPosition $Target $RemainingTime $TimeStamp");
   readingsBeginUpdate($hash);
 	KLF200Node_BulkUpdateStatePtc($hash, $CurrentPosition);
 	KLF200Node_BulkUpdateTarget($hash, $Target);
 	readingsBulkUpdateIfChanged($hash, "remaining", $RemainingTime, 1);
-	readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1) if (defined($OperatingState));
+	readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1);
 	readingsEndUpdate($hash, 1);
 	return $name;
 }
@@ -384,11 +394,11 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   if (not defined($hash)) {return $undefined};
 
 	$NodeName = decode("UTF-8", $NodeName);	
-	my $OperatingState = $hash->{Const}->{OperatingState}->{$State};
-	my $VelocityStr = $hash->{Const}->{Velocity}->{$Velocity};
-	my $NodeTypeSubTypeStr = $hash->{Const}->{NodeTypeSubType}->{$NodeTypeSubType};
-	my $NodeVariationStr = $hash->{Const}->{NodeVariation}->{$NodeVariation};
-	my $PowerModeStr = $hash->{Const}->{PowerMode}->{$PowerMode};
+	my $OperatingState = KLF200Node_GetText($hash, "OperatingState", $State);
+	my $VelocityStr = KLF200Node_GetText($hash, "Velocity", $Velocity);
+	my $NodeTypeSubTypeStr = KLF200Node_GetText($hash, "NodeTypeSubType", $NodeTypeSubType);
+	my $NodeVariationStr = KLF200Node_GetText($hash, "NodeVariation", $NodeVariation);
+	my $PowerModeStr = KLF200Node_GetText($hash, "PowerMode", $PowerMode);
 	my $name = $hash->{NAME};	
 	Log3($hash, 5, "KLF200Node ($name) GW_GET_ALL_NODES_INFORMATION_NTF $commandHex $NodeID $NodeName $State $CurrentPosition $Target $RemainingTime $TimeStamp");
   readingsBeginUpdate($hash);
@@ -396,11 +406,11 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
 	KLF200Node_BulkUpdateTarget($hash, $Target);
 	readingsBulkUpdateIfChanged($hash, "remaining", $RemainingTime, 1);
 	readingsBulkUpdateIfChanged($hash, "name", $NodeName, 1);
-	readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1) if (defined($OperatingState));
-	readingsBulkUpdateIfChanged($hash, "velocity", $VelocityStr, 1) if (defined($VelocityStr));
-	readingsBulkUpdateIfChanged($hash, "nodeTypeSubType", $NodeTypeSubTypeStr, 1) if (defined($NodeTypeSubTypeStr));
-	readingsBulkUpdateIfChanged($hash, "nodeVariation", $NodeVariationStr, 1) if (defined($NodeVariationStr));
-	readingsBulkUpdateIfChanged($hash, "powerMode", $PowerModeStr, 1) if (defined($PowerModeStr));
+	readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1);
+	readingsBulkUpdateIfChanged($hash, "velocity", $VelocityStr, 1);
+	readingsBulkUpdateIfChanged($hash, "nodeTypeSubType", $NodeTypeSubTypeStr, 1);
+	readingsBulkUpdateIfChanged($hash, "nodeVariation", $NodeVariationStr, 1);
+	readingsBulkUpdateIfChanged($hash, "powerMode", $PowerModeStr, 1);
 	readingsEndUpdate($hash, 1);
 	$attr{$name}{alias} = $NodeName if (not defined(AttrVal($name, "alias", undef)));
 	return $name;

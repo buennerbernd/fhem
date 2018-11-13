@@ -59,8 +59,37 @@ sub KLF200_Define($$) {
   
   # open connection with custom init and error callback function (non-blocking connection establishment)
   DevIo_OpenDev($hash, 0, "KLF200_Init", "KLF200_Callback"); 
+
+  KLF200_InitTexts($hash);
  
   return undef;
+}
+
+sub KLF200_InitTexts($) {
+  my ($hash) = @_;
+   
+  $hash->{Const}->{ErrorNumber} = {
+    0 => "Not further defined error.",
+    1 => "Unknown Command or command is not accepted at this state.",
+    3 => "ERROR on Frame Structure.",
+    7 => "Busy. Try again later.",
+    8 => "Bad system table index.",
+    12 => "Not authenticated.",
+  };
+  $hash->{Const}->{Status} = {
+    0 => "OK - Request accepted",
+    1 => "Error – Invalid parameter",
+    2 => "Error – Request rejected",
+  };
+}
+
+sub KLF200_GetText($$$) {
+  my ($hash, $const, $id) = @_;
+  
+  my $text = $hash->{Const}->{$const}->{$id};
+  if (not defined($text)) {return $id};
+  
+  return $text;
 }
 
 # called when definition is undefined 
@@ -107,7 +136,9 @@ sub KLF200_Read($) {
   my $command = substr($bytes, 0, 2);
  	if    ($command eq"\x30\x01") { KLF200_GW_PASSWORD_ENTER_CFM($hash, $bytes); }
  	elsif ($command eq"\x02\x41") { KLF200_GW_HOUSE_STATUS_MONITOR_ENABLE_CFM($hash, $bytes); }
+ 	elsif ($command eq"\x04\x13") { KLF200_GW_ACTIVATE_SCENE_CFM($hash, $bytes); }
  	elsif ($command eq"\x00\x02") { KLF200_GW_REBOOT_CFM($hash, $bytes); }
+ 	elsif ($command eq"\x00\x00") { KLF200_GW_ERROR_NTF($hash, $bytes); }
  	elsif ($command eq"\x03\x02") { KLF200_DispatchToNode($hash, $bytes); }
  	elsif ($command eq"\x03\x03") { KLF200_DispatchToNode($hash, $bytes); }
  	elsif ($command eq"\x02\x11") { KLF200_DispatchToNode($hash, $bytes); }
@@ -209,9 +240,22 @@ sub KLF200_UnwrapBytes($$) {
 
 sub KLF200_Write($$) {
 	my ($hash, $bytes) = @_;
-	
+  my $name = $hash->{NAME};
+
+  if ((ReadingsVal($name, "state", "") ne "Logged in") 
+    and (substr($bytes, 0, 2) ne "\x30\x00")){
+  	Log3 ($name, 1, "KLF200 ($name) Command skipped, not logged in");
+  	return;
+  }	
 	$bytes = KLF200_WrapBytes($hash, $bytes);
-	DevIo_SimpleWrite($hash, $bytes, 0);
+	
+#	DevIo_SimpleWrite($hash, $bytes, 0);
+  my $length = length($bytes);
+  my $written = $hash->{TCPDev}->write($bytes);
+  if ($written ne $length) {
+    $written = "undef" if (not defined($written));
+    Log3 ($name, 1, "KLF200 ($name) Error: written $written of $length bytes");
+  }
 
 	RemoveInternalTimer($hash);
   InternalTimer( gettimeofday() + 600, "KLF200_GW_GET_STATE_REQ", $hash); #call after 10 minutes to keep alive
@@ -375,6 +419,18 @@ sub KLF200_GW_ACTIVATE_SCENE_REQ($$$) {
 	return;
 }
 
+sub KLF200_GW_ACTIVATE_SCENE_CFM($$) {
+	my ($hash, $bytes) = @_;
+	my $name = $hash->{NAME};
+	my ($commandHex, $Status, $SessionID) = unpack("H4 C n", $bytes);
+	Log3($hash, 5, "KLF200 ($name) GW_ACTIVATE_SCENE_CFM $commandHex $Status, $SessionID");
+
+	my $sceneStatus = "Session ". $SessionID . ": " . KLF200_GetText($hash, "Status", $Status);
+
+  readingsSingleUpdate($hash, "sceneStatus", $sceneStatus, 1);
+	return;  
+}
+
 sub KLF200_GW_REBOOT_REQ($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
@@ -391,12 +447,25 @@ sub KLF200_GW_REBOOT_CFM($$) {
 	my ($hash, $bytes) = @_;
 	my $name = $hash->{NAME};
 	my ($commandHex) = unpack("H4", $bytes);
-	Log3($hash, 5, "KLF200 ($name) GW_GW_REBOOT_CFM $commandHex");
+	Log3($hash, 5, "KLF200 ($name) GW_REBOOT_CFM $commandHex");
 
   DevIo_CloseDev($hash);	
 	InternalTimer( gettimeofday() + 30, "KLF200_Ready", $hash); #Try to reconnect in 30 seconds
   readingsSingleUpdate($hash, "connectionsAfterBoot", 0, 1);
 	Log3($name, 1, "KLF200 ($name) - connectionBroken -> reboot started, reconnect in 30 seconds");
+	return;  
+}
+
+sub KLF200_GW_ERROR_NTF($$) {
+	my ($hash, $bytes) = @_;
+	my $name = $hash->{NAME};
+	my ($commandHex, $ErrorNumber) = unpack("H4 C", $bytes);
+	Log3($hash, 5, "KLF200 ($name) GW_ERROR_NTF $commandHex $ErrorNumber");
+
+	my $lastError = KLF200_GetText($hash, "ErrorNumber", $ErrorNumber);
+
+  readingsSingleUpdate($hash, "lastError", $lastError, 1);
+	Log3($name, 1, "KLF200 ($name) - Gateway Error: $lastError");
 	return;  
 }
 1;
