@@ -29,9 +29,9 @@ sub KLF200Node_Define($$) {
   my ($hash, $def) = @_;
  
 	my @param= @{$def};    
-    if(int(@param) < 4) {
-        return "too few parameters: define <name> KLF200Node <DeviceName> <NodeID>";
-    }
+  if(int(@param) < 4) {
+      return "too few parameters: define <name> KLF200Node <DeviceName> <NodeID>";
+  }
     
 	my $DeviceName  = $param[2];
   $hash->{DeviceName} = $DeviceName;
@@ -52,6 +52,7 @@ sub KLF200Node_InitTexts($) {
   $hash->{Const}->{OperatingState} = {
     0 => "Non executing",
     1 => "Error while execution",
+    2 => "'Not used'",
     3 => "Waiting for power",
     4 => "Executing",
     5 => "Done",
@@ -128,10 +129,13 @@ sub KLF200Node_InitTexts($) {
     0x01BA => "Light only supporting on/off",
     0x01C0 => "Gate opener",
     0x01FA => "Gate opener",
+    0x0200 => "Rolling Door Opener",
     0x0240 => "Door lock",
     0x0241 => "Window lock",
     0x0280 => "Vertical Interior Blinds",
+    0x0300 => "Beacon",
     0x0340 => "Dual Roller Shutter",
+    0x0380 => "Heating Temperature Interface",
     0x03C0 => "On/Off switch",
     0x0400 => "Horizontal awning",
     0x0440 => "Exterior Venetian blind",
@@ -143,6 +147,8 @@ sub KLF200Node_InitTexts($) {
     0x0503 => "Air outlet",
     0x0540 => "Exterior heating",
     0x057A => "Exterior heating",
+    0x0580 => "Heat pump",
+    0x05C0 => "Intrusion alarm",
     0x0600 => "Swinging Shutters",
     0x0601 => "Swinging Shutter with independent handling of the leaves",
   }; 
@@ -191,7 +197,6 @@ sub KLF200Node_Set($$$) {
   
   my $name = shift @a;
   my $cmd= shift @a;
-  Debug("Set name: $name cmd: $cmd") if ($cmd ne "?");
   
   if($cmd eq "state") {
   	my $value = shift @a;
@@ -375,7 +380,7 @@ sub KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($$) {
 	KLF200Node_BulkUpdateStatePtc($hash, $CurrentPosition);
 	KLF200Node_BulkUpdateTarget($hash, $Target);
 	readingsBulkUpdateIfChanged($hash, "remaining", $RemainingTime, 1);
-	readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1);
+	readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1) if ($OperatingState ne "'Not used'");
 	readingsEndUpdate($hash, 1);
 	return $name;
 }
@@ -392,11 +397,17 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
 	
   my ($hash, $undefined) = KLF200Node_GetHash($io_hash, $NodeID);
   if (not defined($hash)) {return $undefined};
-
+  
+  $NodeName =~ s/\x00+$//;
 	$NodeName = decode("UTF-8", $NodeName);	
 	my $OperatingState = KLF200Node_GetText($hash, "OperatingState", $State);
 	my $VelocityStr = KLF200Node_GetText($hash, "Velocity", $Velocity);
-	my $NodeTypeSubTypeStr = KLF200Node_GetText($hash, "NodeTypeSubType", $NodeTypeSubType);
+	my $NodeTypeSubTypeStr = $hash->{Const}->{NodeTypeSubType}->{$NodeTypeSubType};
+	if (not defined($NodeTypeSubTypeStr)) {
+	  my $NodeType = $NodeTypeSubType & 0xFFC0; #Match the type only.
+	  $NodeTypeSubTypeStr = $hash->{Const}->{NodeTypeSubType}->{$NodeType};
+	  if (not defined($NodeTypeSubTypeStr)) { $NodeTypeSubTypeStr = $NodeTypeSubType };
+	};
 	my $NodeVariationStr = KLF200Node_GetText($hash, "NodeVariation", $NodeVariation);
 	my $PowerModeStr = KLF200Node_GetText($hash, "PowerMode", $PowerMode);
 	my $name = $hash->{NAME};	
@@ -406,7 +417,7 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
 	KLF200Node_BulkUpdateTarget($hash, $Target);
 	readingsBulkUpdateIfChanged($hash, "remaining", $RemainingTime, 1);
 	readingsBulkUpdateIfChanged($hash, "name", $NodeName, 1);
-	readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1);
+	readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1) if ($OperatingState ne "'Not used'");
 	readingsBulkUpdateIfChanged($hash, "velocity", $VelocityStr, 1);
 	readingsBulkUpdateIfChanged($hash, "nodeTypeSubType", $NodeTypeSubTypeStr, 1);
 	readingsBulkUpdateIfChanged($hash, "nodeVariation", $NodeVariationStr, 1);

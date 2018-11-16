@@ -24,6 +24,7 @@ sub KLF200_Initialize($) {
   $hash->{WriteFn}  = "KLF200_Write";
 	$hash->{AttrList} = "autoReboot:0,1 " . $readingFnAttributes;
   
+  $hash->{parseParams}  = 1;
   $hash->{Clients} = "KLF200Node.*";
   $hash->{MatchList} = { "1:KLF200Node" => ".*" };
   
@@ -32,27 +33,27 @@ sub KLF200_Initialize($) {
 # called when a new definition is created (by hand or from configuration read on FHEM startup)
 sub KLF200_Define($$) {
   my ($hash, $def) = @_;
-  my @a = split("[ \t]+", $def);
-
-#  if($a != 4) {
-#    my $msg = "wrong syntax: define <name> KLF200 <host> <pwfile>";
-#    Log(2, $msg);
-#    return $msg;
-#  }
+	my @param= @{$def};    
+  if(int(@param) < 4) {
+      return "wrong syntax: define <name> KLF200 <host> <pwfile>";
+  }
     
-  my $name = $a[0];
-  # $a[1] is always equals the module name "KLF200"
+  my $name = $param[0];
+  # $param[1] is always equals the module name "KLF200"
   
   # first argument is the hostname or IP address of the device (e.g. "192.168.1.120")
-  my $dev = $a[2]; 
+  my $dev = $param[2]; 
   # add a default port (51200), if not explicitly given by user
   $dev .= ':51200' if(not $dev =~ m/:\d+$/);
   $hash->{DeviceName} = $dev;
   $hash->{SSL} = 1;
   $hash->{TIMEOUT} = 10; #default is 3 
   
-  my $pwfile = $a[3]; 
+  my $pwfile = $param[3]; 
   $hash->{"pwfile"}= $pwfile;
+  $hash->{".sceneUsage"} = "";
+  $hash->{".sceneIDUsage"} = "";
+  $hash->{".sceneToID"} = {};
   
   # close connection if maybe open (on definition modify)
   DevIo_CloseDev($hash) if(DevIo_IsOpen($hash));  
@@ -137,6 +138,8 @@ sub KLF200_Read($) {
  	if    ($command eq"\x30\x01") { KLF200_GW_PASSWORD_ENTER_CFM($hash, $bytes); }
  	elsif ($command eq"\x02\x41") { KLF200_GW_HOUSE_STATUS_MONITOR_ENABLE_CFM($hash, $bytes); }
  	elsif ($command eq"\x04\x13") { KLF200_GW_ACTIVATE_SCENE_CFM($hash, $bytes); }
+ 	elsif ($command eq"\x04\x0D") { KLF200_GW_GET_SCENE_LIST_CFM($hash, $bytes); }
+ 	elsif ($command eq"\x04\x0E") { KLF200_GW_GET_SCENE_LIST_NTF($hash, $bytes); }
  	elsif ($command eq"\x00\x02") { KLF200_GW_REBOOT_CFM($hash, $bytes); }
  	elsif ($command eq"\x00\x00") { KLF200_GW_ERROR_NTF($hash, $bytes); }
  	elsif ($command eq"\x03\x02") { KLF200_DispatchToNode($hash, $bytes); }
@@ -147,22 +150,32 @@ sub KLF200_Read($) {
 }
 
 # called if set command is executed
-sub KLF200_Set($$$@) {
-    my ($hash, $name, $cmd, @arg) = @_;
-    Log3($name, 5, "KLF200 ($name) - Set $cmd") if ($cmd ne "?");
+sub KLF200_Set($$$) {
+  my ($hash, $argsref, undef) = @_;
+  my @a= @{$argsref};
+  return "set needs at least one parameter" if(@a < 2);
+  
+  my $name = shift @a;
+  my $cmd  = shift @a;
+  my $arg1 = shift @a;
+  my $arg2 = shift @a;
+  
+  Log3($name, 5, "KLF200 ($name) - Set $cmd") if ($cmd ne "?");
 
-    if   ($cmd eq "scene") 				{ KLF200_GW_ACTIVATE_SCENE_REQ($hash, $arg[0], 0); }
-    elsif($cmd eq "on") 					{ KLF200_GW_ACTIVATE_SCENE_REQ($hash, 13, 2); } #13: Dachboden 100% fast
-    elsif($cmd eq "off") 					{ KLF200_GW_ACTIVATE_SCENE_REQ($hash, 18, 0); } #18: Dachboden 0%	default 
-    elsif($cmd eq "login") 				{ KLF200_GW_PASSWORD_ENTER_REQ($hash); }
-    elsif($cmd eq "updateNodes") 	{ KLF200_GW_GET_ALL_NODES_INFORMATION_REQ($hash); }
-    elsif($cmd eq "reboot") 	    { KLF200_GW_REBOOT_REQ($hash); }
-    elsif($cmd eq "closeConnection") 	{ DevIo_CloseDev($hash); }
-    elsif($cmd eq "openConnection") 	{ KLF200_Ready($hash); }    
-    else {
-    		my $usage = "unknown argument $cmd, choose one of scene on:noArg off:noArg login:noArg updateNodes:noArg reboot:noArg closeConnection:noArg openConnection:noArg";
-        return $usage;
-    }
+  if   ($cmd eq "scene") 				{ KLF200_GW_ACTIVATE_SCENE_REQ($hash, $hash->{".sceneToID"}->{$arg1}, $arg2); }
+  elsif($cmd eq "sceneID") 			{ KLF200_GW_ACTIVATE_SCENE_REQ($hash, $arg1, $arg2); }
+  elsif($cmd eq "login") 				{ KLF200_GW_PASSWORD_ENTER_REQ($hash); }
+  elsif($cmd eq "updateNodes") 	{ KLF200_GW_GET_ALL_NODES_INFORMATION_REQ($hash); }
+  elsif($cmd eq "updateScenes") { KLF200_GW_GET_SCENE_LIST_REQ($hash); }
+  elsif($cmd eq "reboot") 	    { KLF200_GW_REBOOT_REQ($hash); }
+  elsif($cmd eq "closeConnection") 	{ DevIo_CloseDev($hash); }
+  elsif($cmd eq "openConnection") 	{ KLF200_Ready($hash); }    
+  else {
+      my $sceneUsage = $hash->{".sceneUsage"};
+      my $sceneIDUsage = $hash->{".sceneIDUsage"};
+  		my $usage = "unknown argument $cmd, choose one of scene:$sceneUsage sceneID:$sceneIDUsage login:noArg updateNodes:noArg updateScenes:noArg reboot:noArg closeConnection:noArg openConnection:noArg";
+      return $usage;
+  }
 }
     
 # will be executed upon successful connection establishment (see DevIo_OpenDev())
@@ -242,8 +255,9 @@ sub KLF200_Write($$) {
 	my ($hash, $bytes) = @_;
   my $name = $hash->{NAME};
 
-  if ((ReadingsVal($name, "state", "") ne "Logged in") 
-    and (substr($bytes, 0, 2) ne "\x30\x00")){
+  if (((ReadingsVal($name, "state", "") ne "Logged in") 
+    and (substr($bytes, 0, 2) ne "\x30\x00"))
+    or not defined($hash->{TCPDev})) {
   	Log3 ($name, 1, "KLF200 ($name) Command skipped, not logged in");
   	return;
   }	
@@ -399,12 +413,92 @@ sub KLF200_GW_GET_ALL_NODES_INFORMATION_REQ($) {
 	Log3($hash, 5, "KLF200 ($name) GW_GET_ALL_NODES_INFORMATION_REQ");
 	KLF200_Write($hash, $Command);
 	return;
-} 
+}
+ 
+sub KLF200_GW_GET_SCENE_LIST_REQ($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	
+	my $Command = "\x04\x0C";
+	
+	Log3($hash, 5, "KLF200 ($name) GW_GET_SCENE_LIST_REQ");
+	KLF200_Write($hash, $Command);
+	return;
+}
+
+sub KLF200_GW_GET_SCENE_LIST_CFM($$) {
+	my ($hash, $bytes) = @_;
+	my $name = $hash->{NAME};
+	my ($commandHex, $TotalNumberOfObjects) = unpack("H4 C", $bytes);
+	Log3($hash, 5, "KLF200 ($name) GW_GET_SCENE_LIST_CFM $commandHex $TotalNumberOfObjects");
+
+  $hash->{".sceneUsage"} = "";
+  $hash->{".sceneIDUsage"} = "";
+  $hash->{"SCENES"} = "";
+  %{$hash->{".sceneToID"}} = ();
+  %{$hash->{".idToScene"}} = ();
+	return;  
+}
+
+sub KLF200_GW_GET_SCENE_LIST_NTF($$) {
+	my ($hash, $bytes) = @_;
+	my $name = $hash->{NAME};
+	my ($commandHex, $NumberOfObject) = unpack("H4 C", $bytes);
+	Log3($hash, 5, "KLF200 ($name) GW_GET_SCENE_LIST_NTF $commandHex $NumberOfObject");
+	
+	if ($NumberOfObject == 0) {return;};
+	
+  my $sceneUsage = $hash->{".sceneUsage"};
+  my $sceneIDUsage = $hash->{".sceneIDUsage"};
+  my $scenes = $hash->{"SCENES"};
+	for (my $i = 1; $i <= $NumberOfObject; $i++) {
+	  my $offset = 3 + ($i - 1) * 65;
+    my $sceneObject = substr($bytes, $offset, 65);
+    my ($SceneID, $SceneName) = unpack("C a64", $sceneObject);
+
+    $SceneName =~ s/\x00+$//;
+    $SceneName = decode("UTF-8", $SceneName);
+
+    Log3($hash, 5, "KLF200 ($name) GW_GET_SCENE_LIST_NTF $SceneID $SceneName");
+    $hash->{".idToScene"}->{$SceneID}	= $SceneName;
+    $hash->{".sceneToID"}->{$SceneName}	= $SceneID;
+    
+    $sceneIDUsage.= "," if(length($sceneIDUsage) > 0);
+    $sceneIDUsage.= $SceneID;
+    
+    $scenes.= ", " if(length($scenes) > 0);
+    $scenes.= $SceneID.":\"".$SceneName."\"";
+  }
+  $hash->{".sceneIDUsage"} = $sceneIDUsage;
+  $hash->{"SCENES"} = $scenes;
+  
+  my $offset = 3 + $NumberOfObject * 65;
+  my $RemainingNumberOfObject = unpack("C", substr($bytes, $offset, 1));
+  if ($RemainingNumberOfObject == 0) {
+    #Calculate sorted scene usage at the end
+    foreach my $SceneName (sort values %{$hash->{".idToScene"}}) {
+      my $sceneEscaped = $SceneName;
+      $sceneEscaped =~ s/ /#/g;
+      $sceneUsage.= "," if(length($sceneUsage) > 0);
+      $sceneUsage.= "\"".$sceneEscaped."\"";      
+    }
+    $hash->{".sceneUsage"} = $sceneUsage;
+  }
+  
+  Log3($hash, 5, "KLF200 ($name) GW_GET_SCENE_LIST_NTF sceneUsage $sceneUsage");
+  Log3($hash, 5, "KLF200 ($name) GW_GET_SCENE_LIST_NTF sceneIDUsage $sceneIDUsage");
+	return;  
+}
 
 sub KLF200_GW_ACTIVATE_SCENE_REQ($$$) {
 	my ($hash, $SceneID, $Velocity) = @_;
 	my $name = $hash->{NAME};
 	
+	if (not defined($SceneID)) {
+    Log3($hash, 1, "KLF200 ($name) KLF200_GW_ACTIVATE_SCENE_REQ undefined SceneID");
+    return;
+	};
+	if (not defined($Velocity)) {$Velocity = 0};
 	my $Command = "\x04\x12";
 	my $SessionID = KLF200_getNextSessionID($hash);
 	my $SessionIDShort = pack("n", $SessionID);
@@ -416,6 +510,17 @@ sub KLF200_GW_ACTIVATE_SCENE_REQ($$$) {
 	my $bytes = $Command.$SessionIDShort.$CommandOriginator.$PriorityLevel.$SceneIDByte.$VelocityByte;
 	Log3($hash, 5, "KLF200 ($name) KLF200_GW_ACTIVATE_SCENE_REQ SessionID $SessionID SceneID $SceneID Velocity $Velocity");
 	KLF200_Write($hash, $bytes);
+
+  my $scene = $hash->{".idToScene"}->{$SceneID};	
+	readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "sceneID", $SceneID, 1);
+  if (not defined($scene)) {
+    Log3($hash, 1, "KLF200 ($name) KLF200_GW_ACTIVATE_SCENE_REQ unknown scene name for SceneID $SceneID");
+	}
+	else {
+    readingsBulkUpdate($hash, "scene", $scene, 1);  
+	};
+  readingsEndUpdate($hash, 1);
 	return;
 }
 
