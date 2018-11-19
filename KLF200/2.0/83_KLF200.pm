@@ -54,6 +54,7 @@ sub KLF200_Define($$) {
   $hash->{".sceneUsage"} = "";
   $hash->{".sceneIDUsage"} = "";
   $hash->{".sceneToID"} = {};
+  $hash->{".queue"} = [];
   
   # close connection if maybe open (on definition modify)
   DevIo_CloseDev($hash) if(DevIo_IsOpen($hash));  
@@ -137,11 +138,14 @@ sub KLF200_Read($) {
   my $command = substr($bytes, 0, 2);
  	if    ($command eq"\x30\x01") { KLF200_GW_PASSWORD_ENTER_CFM($hash, $bytes); }
  	elsif ($command eq"\x02\x41") { KLF200_GW_HOUSE_STATUS_MONITOR_ENABLE_CFM($hash, $bytes); }
+ 	elsif ($command eq"\x02\x05") { KLF200_GW_GET_ALL_NODES_INFORMATION_FINISHED_NTF($hash, $bytes); }
  	elsif ($command eq"\x04\x13") { KLF200_GW_ACTIVATE_SCENE_CFM($hash, $bytes); }
+ 	elsif ($command eq"\x03\x04") { KLF200_GW_SESSION_FINISHED_NTF($hash, $bytes); }
  	elsif ($command eq"\x04\x0D") { KLF200_GW_GET_SCENE_LIST_CFM($hash, $bytes); }
  	elsif ($command eq"\x04\x0E") { KLF200_GW_GET_SCENE_LIST_NTF($hash, $bytes); }
  	elsif ($command eq"\x00\x02") { KLF200_GW_REBOOT_CFM($hash, $bytes); }
  	elsif ($command eq"\x00\x00") { KLF200_GW_ERROR_NTF($hash, $bytes); }
+ 	elsif ($command eq"\x03\x01") { KLF200_GW_COMMAND_SEND_CFM($hash, $bytes); }
  	elsif ($command eq"\x03\x02") { KLF200_DispatchToNode($hash, $bytes); }
  	elsif ($command eq"\x03\x03") { KLF200_DispatchToNode($hash, $bytes); }
  	elsif ($command eq"\x02\x11") { KLF200_DispatchToNode($hash, $bytes); }
@@ -166,14 +170,14 @@ sub KLF200_Set($$$) {
   elsif($cmd eq "sceneID") 			{ KLF200_GW_ACTIVATE_SCENE_REQ($hash, $arg1, $arg2); }
   elsif($cmd eq "login") 				{ KLF200_GW_PASSWORD_ENTER_REQ($hash); }
   elsif($cmd eq "updateNodes") 	{ KLF200_GW_GET_ALL_NODES_INFORMATION_REQ($hash); }
-  elsif($cmd eq "updateScenes") { KLF200_GW_GET_SCENE_LIST_REQ($hash); }
+  elsif($cmd eq "updateAll")    { KLF200_UpdateAll($hash); }
   elsif($cmd eq "reboot") 	    { KLF200_GW_REBOOT_REQ($hash); }
   elsif($cmd eq "closeConnection") 	{ DevIo_CloseDev($hash); }
   elsif($cmd eq "openConnection") 	{ KLF200_Ready($hash); }    
   else {
       my $sceneUsage = $hash->{".sceneUsage"};
       my $sceneIDUsage = $hash->{".sceneIDUsage"};
-  		my $usage = "unknown argument $cmd, choose one of scene:$sceneUsage sceneID:$sceneIDUsage login:noArg updateNodes:noArg updateScenes:noArg reboot:noArg closeConnection:noArg openConnection:noArg";
+  		my $usage = "unknown argument $cmd, choose one of scene:$sceneUsage sceneID:$sceneIDUsage login:noArg updateNodes:noArg updateAll:noArg reboot:noArg closeConnection:noArg openConnection:noArg";
       return $usage;
   }
 }
@@ -183,6 +187,7 @@ sub KLF200_Init($) {
     my ($hash) = @_;
 
 		KLF200_GW_PASSWORD_ENTER_REQ($hash);
+		
     return undef; 
 }
 
@@ -194,6 +199,15 @@ sub KLF200_Callback($$) {
     Log3($name, 5, "KLF200 ($name) - error while connecting: $error"); 
 	}
   return undef; 
+}
+
+sub KLF200_UpdateAll($) {
+    my ($hash) = @_;
+
+		KLF200_GW_GET_SCENE_LIST_REQ($hash);
+		KLF200_GW_GET_ALL_NODES_INFORMATION_REQ($hash);
+		KLF200_GW_HOUSE_STATUS_MONITOR_ENABLE_REQ($hash);
+    return; 
 }
 
 sub KLF200_WrapBytes($$) {
@@ -255,6 +269,22 @@ sub KLF200_Write($$) {
 	my ($hash, $bytes) = @_;
   my $name = $hash->{NAME};
 
+  my $queue = $hash->{".queue"};
+#  if (grep $_ eq $bytes, @$queue) {
+#    Log3 ($name, 1, "KLF200 ($name) Skipped command, already in queue");
+#    return;
+#  }
+  push (@$queue, $bytes);
+  readingsSingleUpdate($hash, "queueSize", scalar(@$queue), 1);
+  if (scalar(@$queue) == 1) {
+    KLF200_RunQueue($hash);
+  }
+}
+
+sub KLF200_WriteDirect($$) {
+	my ($hash, $bytes) = @_;
+  my $name = $hash->{NAME};
+
   if (((ReadingsVal($name, "state", "") ne "Logged in") 
     and (substr($bytes, 0, 2) ne "\x30\x00"))
     or not defined($hash->{TCPDev})) {
@@ -275,6 +305,32 @@ sub KLF200_Write($$) {
   InternalTimer( gettimeofday() + 600, "KLF200_GW_GET_STATE_REQ", $hash); #call after 10 minutes to keep alive
   InternalTimer( gettimeofday() + 5, "KLF200_connectionBroken", $hash); #the box answers in 1s, assume after 5s the connection is broken
 	return;
+}
+
+sub KLF200_Dequeue($$$) {
+  my ($hash, $regex, $SessionID) = @_;
+  my $name = $hash->{NAME};
+  my $queue = $hash->{".queue"};
+
+  Log3 ($name, 5, "KLF200 ($name) Dequeue: regex = $regex") if (defined($regex));
+  Log3 ($name, 5, "KLF200 ($name) Dequeue: SessionID = $SessionID") if (defined($SessionID));
+  if (scalar(@$queue) == 0) { return };
+  Log3 ($name, 5, "KLF200 ($name) Dequeue: " . unpack("H*", @$queue[0]));
+  if (defined($regex) and not (@$queue[0] =~ m/$regex/)) { return };
+  if (defined($SessionID) and (pack("n", $SessionID) ne substr(@$queue[0], 2, 2))) { return };
+  shift(@$queue);
+  Log3 ($name, 5, "KLF200 ($name) Dequeue: mached");
+  readingsSingleUpdate($hash, "queueSize", scalar(@$queue), 1);
+  KLF200_RunQueue($hash)
+}
+
+sub KLF200_RunQueue($) {
+  my ($hash) = @_;
+  my $queue = $hash->{".queue"};
+  
+  if (scalar(@$queue) > 0) {
+    KLF200_WriteDirect($hash, @$queue[0]);
+  }
 }
 
 sub KLF200_DispatchToNode($$) {
@@ -340,7 +396,7 @@ sub KLF200_GW_PASSWORD_ENTER_REQ($) {
 	my $Password = pack("a32", KLF200_getPassword($hash));
 	my $bytes = $Command.$Password;
 	Log3($hash, 5, "KLF200 ($name) GW_PASSWORD_ENTER_REQ");
-	KLF200_Write($hash, $bytes);
+	KLF200_WriteDirect($hash, $bytes);
 	return;
 }
 
@@ -361,13 +417,15 @@ sub KLF200_GW_PASSWORD_ENTER_CFM($$) {
   readingsBulkUpdate($hash, "state", "Logged in", 1);
 	readingsEndUpdate($hash, 1);
 	
+	#First run the queue to be responsive
+  KLF200_RunQueue($hash);
   if (($connectionsAfterBoot > 1) and (AttrVal($name, "autoReboot", 1) == 1)) {
   	#After successful login: try to reboot box if this is not the first connection
   	KLF200_GW_REBOOT_REQ($hash);
   	return;
   }
-	#After successful login: start status monitor
-	KLF200_GW_HOUSE_STATUS_MONITOR_ENABLE_REQ($hash);
+	#After successful login: update all system data
+	KLF200_UpdateAll($hash);
 	return;
 }
 
@@ -387,9 +445,8 @@ sub KLF200_GW_HOUSE_STATUS_MONITOR_ENABLE_CFM($$) {
 	my $name = $hash->{NAME};
 	my ($commandHex) = unpack("H4", $bytes);
 	Log3($hash, 5, "KLF200 ($name) GW_HOUSE_STATUS_MONITOR_ENABLE_CFM $commandHex");
-	
-	#After starting status monitor: update all nodes
-	KLF200_GW_GET_ALL_NODES_INFORMATION_REQ($hash);
+
+  KLF200_Dequeue($hash, qr/^\x02\x40/, undef); #GW_HOUSE_STATUS_MONITOR_ENABLE_REQ
 	return;
 }
 
@@ -400,7 +457,7 @@ sub KLF200_GW_GET_STATE_REQ($) {
 	my $Command = "\x00\x0C";
 	
 	Log3($hash, 5, "KLF200 ($name) GW_GET_STATE_REQ");
-	KLF200_Write($hash, $Command);
+	KLF200_WriteDirect($hash, $Command);
 	return;
 }
 
@@ -415,6 +472,16 @@ sub KLF200_GW_GET_ALL_NODES_INFORMATION_REQ($) {
 	return;
 }
  
+sub KLF200_GW_GET_ALL_NODES_INFORMATION_FINISHED_NTF($$) {
+	my ($hash, $bytes) = @_;
+	my $name = $hash->{NAME};
+	my ($commandHex) = unpack("H4", $bytes);
+	Log3($hash, 5, "KLF200 ($name) GW_GET_ALL_NODES_INFORMATION_FINISHED_NTF $commandHex");
+
+  KLF200_Dequeue($hash, qr/^\x02\x02/, undef); #GW_GET_ALL_NODES_INFORMATION_REQ
+	return;
+}
+
 sub KLF200_GW_GET_SCENE_LIST_REQ($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
@@ -483,10 +550,10 @@ sub KLF200_GW_GET_SCENE_LIST_NTF($$) {
       $sceneUsage.= "\"".$sceneEscaped."\"";      
     }
     $hash->{".sceneUsage"} = $sceneUsage;
+    Log3($hash, 5, "KLF200 ($name) GW_GET_SCENE_LIST_NTF sceneUsage $sceneUsage");
+    KLF200_Dequeue($hash, qr/^\x04\x0C/, undef);
   }
   
-  Log3($hash, 5, "KLF200 ($name) GW_GET_SCENE_LIST_NTF sceneUsage $sceneUsage");
-  Log3($hash, 5, "KLF200 ($name) GW_GET_SCENE_LIST_NTF sceneIDUsage $sceneIDUsage");
 	return;  
 }
 
@@ -533,9 +600,33 @@ sub KLF200_GW_ACTIVATE_SCENE_CFM($$) {
 	my $sceneStatus = "Session ". $SessionID . ": " . KLF200_GetText($hash, "Status", $Status);
 
   readingsSingleUpdate($hash, "sceneStatus", $sceneStatus, 1);
+  
+  if ($Status != 0) {
+    #Dequeue in case of error
+    KLF200_Dequeue($hash, qr/^\x04\x12/, $SessionID); #GW_ACTIVATE_SCENE_REQ
+  }
 	return;  
 }
 
+sub KLF200_GW_SESSION_FINISHED_NTF($$) {
+	my ($hash, $bytes) = @_;
+	my $name = $hash->{NAME};
+	my ($commandHex, $SessionID) = unpack("H4 n", $bytes);
+	Log3($hash, 5, "KLF200 ($name) GW_SESSION_FINISHED_NTF $commandHex $SessionID");
+  
+  KLF200_Dequeue($hash, qr/^\x04\x12/, $SessionID); #GW_ACTIVATE_SCENE_REQ
+	return;  
+}
+
+sub KLF200_GW_COMMAND_SEND_CFM($$) {
+	my ($hash, $bytes) = @_;
+	my $name = $hash->{NAME};
+	my ($commandHex, $SessionID, $Status) = unpack("H4 n C", $bytes);
+	Log3($hash, 5, "KLF200 ($name) GW_COMMAND_SEND_CFM $commandHex $SessionID $Status");
+  
+  KLF200_Dequeue($hash, qr/^\x03\x00/, $SessionID); #GW_COMMAND_SEND_REQ
+	return;  
+}
 sub KLF200_GW_REBOOT_REQ($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
@@ -558,6 +649,8 @@ sub KLF200_GW_REBOOT_CFM($$) {
 	InternalTimer( gettimeofday() + 30, "KLF200_Ready", $hash); #Try to reconnect in 30 seconds
   readingsSingleUpdate($hash, "connectionsAfterBoot", 0, 1);
 	Log3($name, 1, "KLF200 ($name) - connectionBroken -> reboot started, reconnect in 30 seconds");
+	
+	KLF200_Dequeue($hash, qr/^\x00\x01/, undef); #GW_REBOOT_REQ
 	return;  
 }
 
@@ -571,6 +664,10 @@ sub KLF200_GW_ERROR_NTF($$) {
 
   readingsSingleUpdate($hash, "lastError", $lastError, 1);
 	Log3($name, 1, "KLF200 ($name) - Gateway Error: $lastError");
+	#Busy handling
+	if ($ErrorNumber == 7) {
+	  InternalTimer( gettimeofday() + 60, "KLF200_RunQueue", $hash); #Try again 60s later.
+	}
 	return;  
 }
 1;
