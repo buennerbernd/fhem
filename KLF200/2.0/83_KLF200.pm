@@ -136,22 +136,22 @@ sub KLF200_Read($) {
   Log3($name, 5, "KLF200 ($name) - received: $hexString"); 
   
   my $command = substr($bytes, 0, 2);
-   if    ($command eq "\x30\x01") { KLF200_GW_PASSWORD_ENTER_CFM($hash, $bytes); }
-   elsif ($command eq "\x20\x01") { KLF200_GW_SET_UTC_CFM($hash, $bytes); }
-   elsif ($command eq "\x02\x41") { KLF200_GW_HOUSE_STATUS_MONITOR_ENABLE_CFM($hash, $bytes); }
-   elsif ($command eq "\x02\x05") { KLF200_GW_GET_ALL_NODES_INFORMATION_FINISHED_NTF($hash, $bytes); }
-   elsif ($command eq "\x04\x13") { KLF200_GW_ACTIVATE_SCENE_CFM($hash, $bytes); }
-   elsif ($command eq "\x03\x04") { KLF200_GW_SESSION_FINISHED_NTF($hash, $bytes); }
-   elsif ($command eq "\x04\x0D") { KLF200_GW_GET_SCENE_LIST_CFM($hash, $bytes); }
-   elsif ($command eq "\x04\x0E") { KLF200_GW_GET_SCENE_LIST_NTF($hash, $bytes); }
-   elsif ($command eq "\x00\x02") { KLF200_GW_REBOOT_CFM($hash, $bytes); }
-   elsif ($command eq "\x00\x00") { KLF200_GW_ERROR_NTF($hash, $bytes); }
-   elsif ($command eq "\x03\x01") { KLF200_GW_COMMAND_SEND_CFM($hash, $bytes); }
-   elsif ($command eq "\x03\x02") { KLF200_DispatchToNode($hash, $bytes); }
-   elsif ($command eq "\x03\x03") { KLF200_DispatchToNode($hash, $bytes); }
-   elsif ($command eq "\x02\x11") { KLF200_DispatchToNode($hash, $bytes); }
-   elsif ($command eq "\x02\x04") { KLF200_DispatchToNode($hash, $bytes); }
-  else  { Log3($name, 1, "KLF200 ($name) - ignored:  $hexString"); }     
+  if    ($command eq "\x30\x01") { KLF200_GW_PASSWORD_ENTER_CFM($hash, $bytes) }
+  elsif ($command eq "\x20\x01") { KLF200_GW_SET_UTC_CFM($hash, $bytes) }
+  elsif ($command eq "\x02\x41") { KLF200_GW_HOUSE_STATUS_MONITOR_ENABLE_CFM($hash, $bytes) }
+  elsif ($command eq "\x02\x05") { KLF200_GW_GET_ALL_NODES_INFORMATION_FINISHED_NTF($hash, $bytes) }
+  elsif ($command eq "\x04\x13") { KLF200_GW_ACTIVATE_SCENE_CFM($hash, $bytes) }
+  elsif ($command eq "\x03\x04") { KLF200_GW_SESSION_FINISHED_NTF($hash, $bytes) }
+  elsif ($command eq "\x04\x0D") { KLF200_GW_GET_SCENE_LIST_CFM($hash, $bytes) }
+  elsif ($command eq "\x04\x0E") { KLF200_GW_GET_SCENE_LIST_NTF($hash, $bytes) }
+  elsif ($command eq "\x00\x02") { KLF200_GW_REBOOT_CFM($hash, $bytes) }
+  elsif ($command eq "\x00\x00") { KLF200_GW_ERROR_NTF($hash, $bytes) }
+  elsif ($command eq "\x03\x01") { KLF200_GW_COMMAND_SEND_CFM($hash, $bytes) }
+  elsif ($command eq "\x03\x02") { KLF200_DispatchToNode($hash, $bytes) }
+  elsif ($command eq "\x03\x03") { KLF200_DispatchToNode($hash, $bytes) }
+  elsif ($command eq "\x02\x11") { KLF200_DispatchToNode($hash, $bytes) }
+  elsif ($command eq "\x02\x04") { KLF200_DispatchToNode($hash, $bytes) }
+  else  { Log3($name, 1, "KLF200 ($name) - ignored:  $hexString") }     
 }
 
 # called if set command is executed
@@ -167,14 +167,14 @@ sub KLF200_Set($$$) {
   
   Log3($name, 5, "KLF200 ($name) - Set $cmd") if ($cmd ne "?");
 
-  if   ($cmd eq "scene")         { KLF200_GW_ACTIVATE_SCENE_REQ($hash, $hash->{".sceneToID"}->{$arg1}, $arg2); }
-  elsif($cmd eq "sceneID")       { KLF200_GW_ACTIVATE_SCENE_REQ($hash, $arg1, $arg2); }
-  elsif($cmd eq "login")         { KLF200_GW_PASSWORD_ENTER_REQ($hash); }
-  elsif($cmd eq "updateNodes")   { KLF200_GW_GET_ALL_NODES_INFORMATION_REQ($hash); }
-  elsif($cmd eq "updateAll")    { KLF200_UpdateAll($hash); }
-  elsif($cmd eq "reboot")       { KLF200_GW_REBOOT_REQ($hash); }
-  elsif($cmd eq "closeConnection")   { DevIo_CloseDev($hash); }
-  elsif($cmd eq "openConnection")   { KLF200_Ready($hash); }    
+  if    ($cmd eq "scene")          { KLF200_GW_ACTIVATE_SCENE_REQ($hash, $hash->{".sceneToID"}->{$arg1}, $arg2) }
+  elsif ($cmd eq "sceneID")        { KLF200_GW_ACTIVATE_SCENE_REQ($hash, $arg1, $arg2) }
+  elsif ($cmd eq "login")          { KLF200_GW_PASSWORD_ENTER_REQ($hash) }
+  elsif ($cmd eq "updateNodes")    { KLF200_GW_GET_ALL_NODES_INFORMATION_REQ($hash) }
+  elsif ($cmd eq "updateAll")      { KLF200_UpdateAll($hash) }
+  elsif ($cmd eq "reboot")         { KLF200_GW_REBOOT_REQ($hash) }
+  elsif ($cmd eq "closeConnection"){ DevIo_CloseDev($hash) }
+  elsif ($cmd eq "openConnection") { KLF200_Ready($hash) }    
   else {
       my $sceneUsage = $hash->{".sceneUsage"};
       my $sceneIDUsage = $hash->{".sceneIDUsage"};
@@ -653,6 +653,7 @@ sub KLF200_GW_COMMAND_SEND_CFM($$) {
   KLF200_Dequeue($hash, qr/^\x03\x00/, $SessionID); #GW_COMMAND_SEND_REQ
   return;  
 }
+
 sub KLF200_GW_REBOOT_REQ($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};

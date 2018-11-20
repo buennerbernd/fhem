@@ -210,10 +210,10 @@ sub KLF200Node_Set($$$) {
     return KLF200Node_SetState($hash, $cmd);
   }
   if($cmd eq "toggle") {
-    my $value = 0;
-    if(ReadingsVal($hash->{NAME}, "pct", "") < 50) {
-      $value = 100;
-    }
+    my $value;
+    if    (ReadingsVal($hash->{NAME}, "operatingState", "") eq "Executing") { $value = "stop" }
+    elsif (ReadingsVal($hash->{NAME}, "pct", "") < 50)                      { $value = 100 }
+    else                                                                    { $value = 0 }
     return KLF200Node_SetState($hash, $value);
   }
   my $usage= "Unknown argument $cmd, choose one of";
@@ -227,12 +227,12 @@ sub KLF200Node_SetState($$) {
   my $name = $hash->{NAME};
   Log3($name, 5, "KLF200Node ($name) - Set $state");
   my $raw;
-  if   ($state eq "stop") { $raw = 0xD200; }
-  elsif($state eq "up")   { $raw = 0x0000; }
-  elsif($state eq "down") { $raw = 0xC800; }
-  elsif($state eq "on")   { $raw = KLF200Node_PctToRaw($hash, 100); }
-  elsif($state eq "off")   { $raw = KLF200Node_PctToRaw($hash, 0); }
-  else                    { $raw = KLF200Node_PctToRaw($hash, $state); }
+  if    ($state eq "stop") { $raw = 0xD200 }
+  elsif ($state eq "up")   { $raw = 0x0000 }
+  elsif ($state eq "down") { $raw = 0xC800 }
+  elsif ($state eq "on")   { $raw = KLF200Node_PctToRaw($hash, 100) }
+  elsif ($state eq "off")  { $raw = KLF200Node_PctToRaw($hash, 0) }
+  else                     { $raw = KLF200Node_PctToRaw($hash, $state) }
 
   return KLF200Node_GW_COMMAND_SEND_REQ($hash, $raw); 
 }
@@ -246,10 +246,10 @@ sub KLF200Node_Parse ($$)
   Log3($io_name, 5, "KLF200Node ($io_name) - received: $hexString"); 
   
   my $command = substr($bytes, 0, 2);
-   if    ($command eq"\x03\x02") { return KLF200Node_GW_COMMAND_RUN_STATUS_NTF($io_hash, $bytes) }
-   elsif ($command eq"\x03\x03") { return KLF200Node_GW_COMMAND_REMAINING_TIME_NTF($io_hash, $bytes) }
-   elsif ($command eq"\x02\x11") { return KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($io_hash, $bytes) }
-   elsif ($command eq"\x02\x04") { return KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($io_hash, $bytes) }
+  if    ($command eq"\x03\x02") { return KLF200Node_GW_COMMAND_RUN_STATUS_NTF($io_hash, $bytes) }
+  elsif ($command eq"\x03\x03") { return KLF200Node_GW_COMMAND_REMAINING_TIME_NTF($io_hash, $bytes) }
+  elsif ($command eq"\x02\x11") { return KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($io_hash, $bytes) }
+  elsif ($command eq"\x02\x04") { return KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($io_hash, $bytes) }
   else  { Log3($io_name, 1, "KLF200Node ($io_name) - ignored:  $hexString"); return undef; }
 }
 
@@ -270,6 +270,8 @@ sub KLF200Node_RawToPct($$) {
 sub KLF200Node_PctToRaw($$) {
   my ($hash, $pct) = @_; 
   my $name = $hash->{NAME};
+  if    ($pct < 0)   {$pct = 0}
+  elsif ($pct > 100) {$pct = 100};
   my $raw;
   my $directionOn = AttrVal($name, "directionOn", "up");
   if ($directionOn eq "up") { 
@@ -336,7 +338,7 @@ sub KLF200Node_GW_COMMAND_RUN_STATUS_NTF($$) {
   };
   readingsBulkUpdateIfChanged($hash, "runStatus", $RunStatusStr, 1);
   readingsBulkUpdateIfChanged($hash, "statusReply", $StatusReplyStr, 1);
-  if ($RunStatus != 2){
+  if ($RunStatus != 2) {
     readingsBulkUpdateIfChanged($hash, "remaining", 0, 1);
   }
   readingsEndUpdate($hash, 1);
@@ -374,7 +376,7 @@ sub KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($$) {
   if (not defined($hash)) {return $undefined};
 
   my $name = $hash->{NAME};
-  Log3($hash, 5, "KLF200Node ($name) GW_NODE_STATE_POSITION_CHANGED_NTF $commandHex $NodeID $State $CurrentPosition $Target $RemainingTime $TimeStamp");
+  Log3($hash, 5, "KLF200Node ($name) GW_NODE_STATE_POSITION_CHANGED_NTF $commandHex $NodeID $State C:$CurrentPosition T:$Target $RemainingTime $TimeStamp");
   my $OperatingState = KLF200Node_GetText($hash, "OperatingState", $State);
   readingsBeginUpdate($hash);
   KLF200Node_BulkUpdateStatePtc($hash, $CurrentPosition);
@@ -412,7 +414,7 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   my $PowerModeStr = KLF200Node_GetText($hash, "PowerMode", $PowerMode);
   my $name = $hash->{NAME};
   my $klf200Time = FmtDateTime($TimeStamp);
-  Log3($hash, 5, "KLF200Node ($name) GW_GET_ALL_NODES_INFORMATION_NTF $commandHex $NodeID $NodeName $State $CurrentPosition $Target $RemainingTime $klf200Time");
+  Log3($hash, 5, "KLF200Node ($name) GW_GET_ALL_NODES_INFORMATION_NTF $commandHex $NodeID $NodeName $State C:$CurrentPosition T:$Target $RemainingTime $klf200Time");
   readingsBeginUpdate($hash);
   KLF200Node_BulkUpdateStatePtc($hash, $CurrentPosition);
   KLF200Node_BulkUpdateTarget($hash, $Target);
@@ -440,16 +442,16 @@ sub KLF200Node_GW_COMMAND_SEND_REQ($$) {
   my $SessionIDShort = pack("n", $SessionID);
   my $CommandOriginator = "\x08"; #SAAC Stand Alone Automatic Controls 
   my $PriorityLevel = "\05"; #Comfort Level 2 Used by Stand Alone Automatic Controls 
-   my $ParameterActive = "\x00";
-   my $FPI1FPI2 = "\x00\x00";
-   my $FunctionalParameterValueArray = pack("nx32", $raw);
-   my $IndexArrayCount = pack("C", 1);
-   my $IndexArray = pack("Cx19", $NodeId);
-   my $PriorityLevelLock = "\x00\x00\x00\x00";
+  my $ParameterActive = "\x00";
+  my $FPI1FPI2 = "\x00\x00";
+  my $FunctionalParameterValueArray = pack("nx32", $raw);
+  my $IndexArrayCount = pack("C", 1);
+  my $IndexArray = pack("Cx19", $NodeId);
+  my $PriorityLevelLock = "\x00\x00\x00\x00";
 
-   my $bytes = $Command.$SessionIDShort.$CommandOriginator.$PriorityLevel.$ParameterActive.$FPI1FPI2
-     .$FunctionalParameterValueArray.$IndexArrayCount.$IndexArray.$PriorityLevelLock;
-   return IOWrite($hash, $bytes);
+  my $bytes = $Command.$SessionIDShort.$CommandOriginator.$PriorityLevel.$ParameterActive.$FPI1FPI2
+    .$FunctionalParameterValueArray.$IndexArrayCount.$IndexArray.$PriorityLevelLock;
+  return IOWrite($hash, $bytes);
 }
 
 1;
