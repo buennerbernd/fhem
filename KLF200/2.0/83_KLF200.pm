@@ -83,6 +83,16 @@ sub KLF200_InitTexts($) {
     1 => "Error – Invalid parameter",
     2 => "Error – Request rejected",
   };
+  $hash->{Const}->{SubState} = {
+    0x00 => "Idle state",
+    0x01 => "Performing task in Configuration Service handler",
+    0x02 => "Performing Scene Configuration",
+    0x03 => "Performing Information Service Configuration",
+    0x04 => "Performing Contact input Configuration",
+    0x80 => "Performing task in Command Handler",
+    0x81 => "Performing task in Activate Group Handler",
+    0x82 => "Performing task in Activate Scene Handler",
+  };
 }
 
 sub KLF200_GetText($$$) {
@@ -136,10 +146,12 @@ sub KLF200_Read($) {
   Log3($name, 5, "KLF200 ($name) - received: $hexString"); 
   
   my $command = substr($bytes, 0, 2);
-  if    ($command eq "\x30\x01") { KLF200_GW_PASSWORD_ENTER_CFM($hash, $bytes) }
+  if    ($command eq "\x00\x0D") { KLF200_GW_GET_STATE_CFM($hash, $bytes) }
+  elsif ($command eq "\x30\x01") { KLF200_GW_PASSWORD_ENTER_CFM($hash, $bytes) }
   elsif ($command eq "\x20\x01") { KLF200_GW_SET_UTC_CFM($hash, $bytes) }
   elsif ($command eq "\x02\x41") { KLF200_GW_HOUSE_STATUS_MONITOR_ENABLE_CFM($hash, $bytes) }
   elsif ($command eq "\x02\x05") { KLF200_GW_GET_ALL_NODES_INFORMATION_FINISHED_NTF($hash, $bytes) }
+  elsif ($command eq "\x00\x09") { KLF200_GW_GET_VERSION_CFM($hash, $bytes) }
   elsif ($command eq "\x04\x13") { KLF200_GW_ACTIVATE_SCENE_CFM($hash, $bytes) }
   elsif ($command eq "\x03\x04") { KLF200_GW_SESSION_FINISHED_NTF($hash, $bytes) }
   elsif ($command eq "\x04\x0D") { KLF200_GW_GET_SCENE_LIST_CFM($hash, $bytes) }
@@ -151,6 +163,7 @@ sub KLF200_Read($) {
   elsif ($command eq "\x03\x03") { KLF200_DispatchToNode($hash, $bytes) }
   elsif ($command eq "\x02\x11") { KLF200_DispatchToNode($hash, $bytes) }
   elsif ($command eq "\x02\x04") { KLF200_DispatchToNode($hash, $bytes) }
+  elsif ($command eq "\x01\x02") { KLF200_DispatchToNode($hash, $bytes) }
   else  { Log3($name, 1, "KLF200 ($name) - ignored:  $hexString") }     
 }
 
@@ -207,6 +220,8 @@ sub KLF200_UpdateAll($) {
 
     KLF200_GW_GET_SCENE_LIST_REQ($hash);
     KLF200_GW_GET_ALL_NODES_INFORMATION_REQ($hash);
+    KLF200_GW_CS_GET_SYSTEMTABLE_DATA_REQ($hash);
+    KLF200_GW_GET_VERSION_REQ($hash);
     KLF200_GW_HOUSE_STATUS_MONITOR_ENABLE_REQ($hash);
     return; 
 }
@@ -215,9 +230,6 @@ sub KLF200_WrapBytes($$) {
   my ($hash, $bytes) = @_;
   my $name = $hash->{NAME};
   my $SLIP_END = "\xC0";
-  my $SLIP_ESC = "\xDB";
-  my $SLIP_ESC_END = "\xDC";
-  my $SLIP_ESC_ESC = "\xDD";
   my $ProtocolID = "\x00";
 
   my $hexString = unpack("H*", $bytes);
@@ -487,6 +499,23 @@ sub KLF200_GW_GET_STATE_REQ($) {
   return;
 }
 
+sub KLF200_GW_GET_STATE_CFM($$) {
+  my ($hash, $bytes) = @_;
+  my $name = $hash->{NAME};
+  my ($commandHex, $GatewayState, $SubState, $StateData) = unpack("H4 C C n", $bytes);
+  Log3($hash, 5, "KLF200 ($name) GW_GET_STATE_CFM $commandHex $GatewayState $SubState $StateData");
+
+  if (($GatewayState) == 2 or ($GatewayState == 1)) {
+    my $SubStateStr = KLF200_GetText($hash, "SubState", $SubState);
+    readingsSingleUpdate($hash, "subState", $SubStateStr, 1);
+    
+    #If the box is in idle state and the queue is not empty: run the queue.
+    #This should never happen, just to be on the safe side.
+    KLF200_RunQueue($hash) if ($SubState == 0x00);
+  }  
+  return;
+}
+
 sub KLF200_GW_GET_ALL_NODES_INFORMATION_REQ($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
@@ -506,6 +535,47 @@ sub KLF200_GW_GET_ALL_NODES_INFORMATION_FINISHED_NTF($$) {
 
   KLF200_Dequeue($hash, qr/^\x02\x02/, undef); #GW_GET_ALL_NODES_INFORMATION_REQ
   return;
+}
+
+sub KLF200_GW_CS_GET_SYSTEMTABLE_DATA_REQ($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  
+  my $Command = "\x01\x00";
+  
+  Log3($hash, 5, "KLF200 ($name) GW_CS_GET_SYSTEMTABLE_DATA_REQ");
+  KLF200_Write($hash, $Command);
+  return;
+}
+
+sub KLF200_GW_GET_VERSION_REQ($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  
+  my $Command = "\x00\x08";
+  
+  Log3($hash, 5, "KLF200 ($name) GW_GET_VERSION_REQ");
+  KLF200_Write($hash, $Command);
+  return;
+}
+
+sub KLF200_GW_GET_VERSION_CFM($$) {
+  my ($hash, $bytes) = @_;
+  my $name = $hash->{NAME};
+  my ($commandHex, $SoftwareVersion1, $SoftwareVersion2, $SoftwareVersion3, $SoftwareVersion4, $SoftwareVersion5, $SoftwareVersion6,
+    $HardwareVersion, $ProductGroup, $ProductType) 
+    = unpack("H4 C C C C C C C C C", $bytes);
+  my $SoftwareVersion = "$SoftwareVersion1.$SoftwareVersion2.$SoftwareVersion3.$SoftwareVersion4.$SoftwareVersion5.$SoftwareVersion6";
+  Log3($hash, 5, "KLF200 ($name) GW_GET_SCENE_LIST_CFM $commandHex $SoftwareVersion $HardwareVersion");
+
+  readingsBeginUpdate($hash);
+  readingsBulkUpdateIfChanged($hash, "softwareVersion", $SoftwareVersion, 1);
+  readingsBulkUpdateIfChanged($hash, "hardwareVersion", $HardwareVersion, 1);
+#  readingsBulkUpdateIfChanged($hash, "model", $model, 1);
+  readingsEndUpdate($hash, 1);
+   
+  KLF200_Dequeue($hash, qr/^\x00\x08/, undef);
+  return;  
 }
 
 sub KLF200_GW_GET_SCENE_LIST_REQ($) {
@@ -539,13 +609,11 @@ sub KLF200_GW_GET_SCENE_LIST_NTF($$) {
   my ($commandHex, $NumberOfObject) = unpack("H4 C", $bytes);
   Log3($hash, 5, "KLF200 ($name) GW_GET_SCENE_LIST_NTF $commandHex $NumberOfObject");
   
-  if ($NumberOfObject == 0) {return;};
-  
   my $sceneUsage = $hash->{".sceneUsage"};
   my $sceneIDUsage = $hash->{".sceneIDUsage"};
   my $scenes = $hash->{"SCENES"};
-  for (my $i = 1; $i <= $NumberOfObject; $i++) {
-    my $offset = 3 + ($i - 1) * 65;
+  for (my $i = 0; $i < $NumberOfObject; $i++) {
+    my $offset = 3 + $i * 65;
     my $sceneObject = substr($bytes, $offset, 65);
     my ($SceneID, $SceneName) = unpack("C a64", $sceneObject);
 
@@ -693,10 +761,6 @@ sub KLF200_GW_ERROR_NTF($$) {
 
   readingsSingleUpdate($hash, "lastError", $lastError, 1);
   Log3($name, 1, "KLF200 ($name) - Gateway Error: $lastError");
-  #Busy handling
-  if ($ErrorNumber == 7) {
-    InternalTimer( gettimeofday() + 60, "KLF200_RunQueue", $hash); #Try again 60s later.
-  }
   return;  
 }
 1;

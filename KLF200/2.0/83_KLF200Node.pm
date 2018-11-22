@@ -163,6 +163,20 @@ sub KLF200Node_InitTexts($) {
     0 => "ALWAYS ALIVE",
     1 => "LOW POWER MODE",
   };
+  $hash->{Const}->{ioManufacturerId} = {
+    1 => "VELUX",
+    2 => "Somfy",
+    3 => "Honeywell",
+    4 => "Hörmann",
+    5 => "ASSA ABLOY",
+    6 => "Niko",
+    7 => "WINDOW MASTER",
+    8 => "Renson",
+    9 => "CIAT",
+    10 => "Secuyou",
+    11 => "OVERKIZ",
+    12 => "Atlantic Group",
+  };
    
   return;
 }
@@ -246,10 +260,11 @@ sub KLF200Node_Parse ($$)
   Log3($io_name, 5, "KLF200Node ($io_name) - received: $hexString"); 
   
   my $command = substr($bytes, 0, 2);
-  if    ($command eq"\x03\x02") { return KLF200Node_GW_COMMAND_RUN_STATUS_NTF($io_hash, $bytes) }
-  elsif ($command eq"\x03\x03") { return KLF200Node_GW_COMMAND_REMAINING_TIME_NTF($io_hash, $bytes) }
-  elsif ($command eq"\x02\x11") { return KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($io_hash, $bytes) }
-  elsif ($command eq"\x02\x04") { return KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($io_hash, $bytes) }
+  if    ($command eq "\x03\x02") { return KLF200Node_GW_COMMAND_RUN_STATUS_NTF($io_hash, $bytes) }
+  elsif ($command eq "\x03\x03") { return KLF200Node_GW_COMMAND_REMAINING_TIME_NTF($io_hash, $bytes) }
+  elsif ($command eq "\x02\x11") { return KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($io_hash, $bytes) }
+  elsif ($command eq "\x02\x04") { return KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($io_hash, $bytes) }
+  elsif ($command eq "\x01\x02") { return KLF200Node_GW_CS_GET_SYSTEMTABLE_DATA_NTF($io_hash, $bytes) }
   else  { Log3($io_name, 1, "KLF200Node ($io_name) - ignored:  $hexString"); return undef; }
 }
 
@@ -392,10 +407,10 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   
   my ($commandHex, $NodeID, $Order, $Placement, $NodeName, $Velocity, 
     $NodeTypeSubType, $ProductGroup, $ProductType, $NodeVariation, $PowerMode, $BuildNumber,
-    $Serial, $State, $CurrentPosition, $Target, 
+    $Serial1, $Serial2, $Serial3, $Serial4, $Serial5, $Serial6, $State, $CurrentPosition, $Target, 
     $FP1CurrentPosition, $FP2CurrentPosition, $FP3CurrentPosition, $FP4CurrentPosition,
     $RemainingTime, $TimeStamp, $NbrOfAlias, $AliasArray) 
-    = unpack("H4 C n C a64 C n C C C C C H16 C n n n n n n n N C H*", $bytes);
+    = unpack("H4 C n C a64 C n C C C C C C n C C C n C n n n n n n n N C H*", $bytes);
   
   my ($hash, $undefined) = KLF200Node_GetHash($io_hash, $NodeID);
   if (not defined($hash)) {return $undefined};
@@ -414,6 +429,7 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   my $PowerModeStr = KLF200Node_GetText($hash, "PowerMode", $PowerMode);
   my $name = $hash->{NAME};
   my $klf200Time = FmtDateTime($TimeStamp);
+  my $Serial = "$Serial1 $Serial2 $Serial3 $Serial4 $Serial5 $Serial6 (20$Serial4 week $Serial5?)";
   Log3($hash, 5, "KLF200Node ($name) GW_GET_ALL_NODES_INFORMATION_NTF $commandHex $NodeID $NodeName $State C:$CurrentPosition T:$Target $RemainingTime $klf200Time");
   readingsBeginUpdate($hash);
   KLF200Node_BulkUpdateStatePtc($hash, $CurrentPosition);
@@ -425,9 +441,56 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   readingsBulkUpdateIfChanged($hash, "nodeTypeSubType", $NodeTypeSubTypeStr, 1);
   readingsBulkUpdateIfChanged($hash, "nodeVariation", $NodeVariationStr, 1);
   readingsBulkUpdateIfChanged($hash, "powerMode", $PowerModeStr, 1);
+  readingsBulkUpdateIfChanged($hash, "buildNumber", $BuildNumber, 1);
+  readingsBulkUpdateIfChanged($hash, "serial", $Serial, 1);
   readingsEndUpdate($hash, 1);
   $attr{$name}{alias} = $NodeName if (not defined(AttrVal($name, "alias", undef)));
   return $name;
+}
+
+sub KLF200Node_GW_CS_GET_SYSTEMTABLE_DATA_NTF($$) {
+  my ($io_hash, $bytes) = @_;
+  my $io_name = $io_hash->{NAME};
+  
+  my ($commandHex, $NumberOfEntry) = unpack("H4 C", $bytes);
+
+  my $result;
+  for (my $i = 0; $i < $NumberOfEntry; $i++) {
+    my $offset = 3 + $i * 11;
+    my $SystemTableObject = substr($bytes, $offset, 11);
+    my ($NodeID, $ActuatorAddress, $NodeTypeSubType, $Bits, $ioManufacturerId, $BackboneReferenceNumber) = unpack("C H6 n C C H6", $SystemTableObject);
+
+    if ($NodeID < 200) { #Handle only actuators, ignore beacons
+      my ($hash, $undefined) = KLF200Node_GetHash($io_hash, $NodeID);
+      if (not defined($hash)) {
+        $result = $undefined;
+      }
+      else {
+        my $name = $hash->{NAME};
+        my $ioManufacturer = KLF200Node_GetText($hash, "ioManufacturerId", $ioManufacturerId);
+        my $NodeTypeSubTypeStr = $hash->{Const}->{NodeTypeSubType}->{$NodeTypeSubType};
+        if (not defined($NodeTypeSubTypeStr)) {
+          my $NodeType = $NodeTypeSubType & 0xFFC0; #Match the type only.
+          $NodeTypeSubTypeStr = $hash->{Const}->{NodeTypeSubType}->{$NodeType};
+          if (not defined($NodeTypeSubTypeStr)) { $NodeTypeSubTypeStr = $NodeTypeSubType };
+        };
+        my $model = $ioManufacturer." ".$NodeTypeSubTypeStr;
+        readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged($hash, "ioManufacturer", $ioManufacturer, 1);
+        readingsBulkUpdateIfChanged($hash, "nodeTypeSubType", $NodeTypeSubTypeStr, 1);
+        readingsBulkUpdateIfChanged($hash, "model", $model, 1);
+        readingsEndUpdate($hash, 1);
+        $result = $name if (not defined($result));
+      }
+    }
+  }
+  my $offset = 3 + $NumberOfEntry * 11;
+  my $RemainingNumberOfEntry = unpack("C", substr($bytes, $offset, 1));
+  Log3($io_hash, 5, "KLF200Node ($io_name) GW_CS_GET_SYSTEMTABLE_DATA_NTF $commandHex $NumberOfEntry $RemainingNumberOfEntry");
+  if ($RemainingNumberOfEntry == 0) {
+    KLF200_Dequeue($io_hash, qr/^\x01\x00/, undef);
+  }
+  return $result;
 }
 
 sub KLF200Node_GW_COMMAND_SEND_REQ($$) {
