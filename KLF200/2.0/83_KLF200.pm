@@ -34,23 +34,20 @@ sub KLF200_Initialize($) {
 sub KLF200_Define($$) {
   my ($hash, $def) = @_;
   my @param= @{$def};    
-  if(int(@param) < 4) {
-      return "wrong syntax: define <name> KLF200 <host> <pwfile>";
+  if(int(@param) < 3) {
+      return "wrong syntax: define <name> KLF200 <host>";
   }
     
   my $name = $param[0];
   # $param[1] is always equals the module name "KLF200"
   
   # first argument is the hostname or IP address of the device (e.g. "192.168.1.120")
-  my $dev = $param[2]; 
-  # add a default port (51200), if not explicitly given by user
-  $dev .= ':51200' if(not $dev =~ m/:\d+$/);
-  $hash->{DeviceName} = $dev;
+  my $host = $param[2]; 
+  $hash->{Host} = $host;
+  $hash->{DeviceName} = $host.':51200';
   $hash->{SSL} = 1;
   $hash->{TIMEOUT} = 10; #default is 3 
   
-  my $pwfile = $param[3]; 
-  $hash->{"pwfile"}= $pwfile;
   $hash->{".sceneUsage"} = "";
   $hash->{".sceneIDUsage"} = "";
   $hash->{".sceneToID"} = {};
@@ -182,7 +179,7 @@ sub KLF200_Set($$$) {
 
   if    ($cmd eq "scene")          { KLF200_GW_ACTIVATE_SCENE_REQ($hash, $hash->{".sceneToID"}->{$arg1}, $arg2) }
   elsif ($cmd eq "sceneID")        { KLF200_GW_ACTIVATE_SCENE_REQ($hash, $arg1, $arg2) }
-  elsif ($cmd eq "login")          { KLF200_GW_PASSWORD_ENTER_REQ($hash) }
+  elsif ($cmd eq "login")          { KLF200_login($hash, $arg1) }
   elsif ($cmd eq "updateNodes")    { KLF200_GW_GET_ALL_NODES_INFORMATION_REQ($hash) }
   elsif ($cmd eq "updateAll")      { KLF200_UpdateAll($hash) }
   elsif ($cmd eq "reboot")         { KLF200_GW_REBOOT_REQ($hash) }
@@ -191,7 +188,7 @@ sub KLF200_Set($$$) {
   else {
       my $sceneUsage = $hash->{".sceneUsage"};
       my $sceneIDUsage = $hash->{".sceneIDUsage"};
-      my $usage = "unknown argument $cmd, choose one of scene:$sceneUsage sceneID:$sceneIDUsage login:noArg updateNodes:noArg updateAll:noArg reboot:noArg closeConnection:noArg openConnection:noArg";
+      my $usage = "unknown argument $cmd, choose one of scene:$sceneUsage sceneID:$sceneIDUsage login updateNodes:noArg updateAll:noArg reboot:noArg closeConnection:noArg openConnection:noArg";
       return $usage;
   }
 }
@@ -200,7 +197,7 @@ sub KLF200_Set($$$) {
 sub KLF200_Init($) {
     my ($hash) = @_;
 
-    KLF200_GW_PASSWORD_ENTER_REQ($hash);
+    KLF200_login($hash, undef);
     
     return undef; 
 }
@@ -373,6 +370,79 @@ sub KLF200_getPassword($) {
   }
 }
 
+sub KLF200_login($$) {
+  my ($hash,$password) = @_;
+  
+  if ((not defined($password)) or ($password eq "")) {
+    $password = KLF200_ReadPassword($hash);
+    if (not defined($password)) {
+      readingsSingleUpdate($hash, "state", "Login with password requiered", 1);
+      return;
+    }
+  }
+  else {
+    KLF200_StorePassword($hash,$password);
+  }
+  KLF200_GW_PASSWORD_ENTER_REQ($hash,$password);
+  return;
+}
+
+sub KLF200_StorePassword($$) {
+  my ($hash, $password) = @_;
+  my $index = $hash->{TYPE}."_".$hash->{Host}."_passwd";
+  my $key = getUniqueId().$index;
+  my $enc_pwd = "";
+
+  if(eval "use Digest::MD5;1") {
+    $key = Digest::MD5::md5_hex(unpack "H*", $key);
+    $key .= Digest::MD5::md5_hex($key);
+  }
+  
+  for my $char (split //, $password) {
+    my $encode=chop($key);
+    $enc_pwd.=sprintf("%.2x",ord($char)^ord($encode));
+    $key=$encode.$key;
+  }
+  
+  my $err = setKeyValue($index, $enc_pwd);
+  return "error while saving the password - $err" if(defined($err));
+
+  return "password successfully saved";
+}
+
+sub KLF200_ReadPassword($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $index = $hash->{TYPE}."_".$hash->{Host}."_passwd";
+  my $key = getUniqueId().$index;
+  
+  Log3($name, 5, "KLF200 $name: Read password from file");
+  
+  my ($err, $password) = getKeyValue($index);
+
+  if ( defined($err) ) {
+    Log3($name, 3, "KLF200 $name: unable to read password from file: $err");
+    return undef; 
+  }
+  
+  if ( defined($password) ) {
+    if ( eval "use Digest::MD5;1" ) {
+      $key = Digest::MD5::md5_hex(unpack "H*", $key);
+      $key .= Digest::MD5::md5_hex($key);
+    }
+    my $dec_pwd = '';
+    for my $char (map { pack('C', hex($_)) } ($password =~ /(..)/g)) {
+      my $decode=chop($key);
+      $dec_pwd.=chr(ord($char)^ord($decode));
+      $key=$decode.$key;
+    }
+    return $dec_pwd;
+  } else {
+    Log3($name, 3, "KLF200 $name: No password in file");
+    return undef;
+  }
+}
+
 sub KLF200_getNextSessionID($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
@@ -401,12 +471,12 @@ sub KLF200_connectionBroken($) {
   return;
 }
 
-sub KLF200_GW_PASSWORD_ENTER_REQ($) {
-  my ($hash) = @_;
+sub KLF200_GW_PASSWORD_ENTER_REQ($$) {
+  my ($hash, $passwordStr) = @_;
   my $name = $hash->{NAME};
   
   my $Command = "\x30\x00";
-  my $Password = pack("a32", KLF200_getPassword($hash));
+  my $Password = pack("a32", $passwordStr); #UTF-8?
   my $bytes = $Command.$Password;
   Log3($hash, 5, "KLF200 ($name) GW_PASSWORD_ENTER_REQ");
   KLF200_WriteDirect($hash, $bytes);
