@@ -353,23 +353,6 @@ sub KLF200_DispatchToNode($$) {
   return;
 }
 
-sub KLF200_getPassword($) {
-  my ($hash) = @_;
-  my $default = "velux123";
-  
-  my $pwfile= $hash->{"pwfile"};
-  if(open(PWFILE, $pwfile)) {
-    my @contents= <PWFILE>;
-    close(PWFILE);
-    return $default unless @contents;
-    my $password = $contents[0];
-    chomp $password;
-    return $password;
-  } else {
-    return $default;
-  }
-}
-
 sub KLF200_login($$) {
   my ($hash,$password) = @_;
   
