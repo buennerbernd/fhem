@@ -429,7 +429,7 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   my $PowerModeStr = KLF200Node_GetText($hash, "PowerMode", $PowerMode);
   my $name = $hash->{NAME};
   my $klf200Time = FmtDateTime($TimeStamp);
-  my $Serial = "$Serial1 $Serial2 $Serial3 $Serial4 $Serial5 $Serial6 (20$Serial4 week $Serial5?)";
+  my $Serial = "$Serial1 $Serial2 $Serial3 $Serial4 $Serial5 $Serial6";
   Log3($hash, 5, "KLF200Node ($name) GW_GET_ALL_NODES_INFORMATION_NTF $commandHex $NodeID $NodeName $State C:$CurrentPosition T:$Target $RemainingTime $klf200Time");
   readingsBeginUpdate($hash);
   KLF200Node_BulkUpdateStatePtc($hash, $CurrentPosition);
@@ -442,7 +442,15 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   readingsBulkUpdateIfChanged($hash, "nodeVariation", $NodeVariationStr, 1);
   readingsBulkUpdateIfChanged($hash, "powerMode", $PowerModeStr, 1);
   readingsBulkUpdateIfChanged($hash, "buildNumber", $BuildNumber, 1);
-  readingsBulkUpdateIfChanged($hash, "serial", $Serial, 1);
+  if (defined(readingsBulkUpdateIfChanged($hash, "serial", $Serial, 1))) {
+    my $year = 2000 + $Serial4;
+    my (undef,undef,undef,undef,undef,$maxYear,undef,undef,undef) = localtime();
+    $maxYear += 1900;
+    if (($year >= 2005) and ($year <= $maxYear) and ($Serial5 <= 53)) {
+      my $production = $year." week ".$Serial5;
+      readingsBulkUpdate($hash, "production", $production, 1);
+    }
+  }
   readingsEndUpdate($hash, 1);
   $attr{$name}{alias} = $NodeName if (not defined(AttrVal($name, "alias", undef)));
   return $name;
