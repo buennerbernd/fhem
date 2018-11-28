@@ -624,7 +624,7 @@ sub KLF200_GW_GET_VERSION_CFM($$) {
   readingsBeginUpdate($hash);
   readingsBulkUpdateIfChanged($hash, "softwareVersion", $SoftwareVersion, 1);
   readingsBulkUpdateIfChanged($hash, "hardwareVersion", $HardwareVersion, 1);
-#  readingsBulkUpdateIfChanged($hash, "model", $model, 1);
+  readingsBulkUpdateIfChanged($hash, "model", $SoftwareVersion, 1);
   readingsEndUpdate($hash, 1);
    
   KLF200_Dequeue($hash, qr/^\x00\x08/, undef);

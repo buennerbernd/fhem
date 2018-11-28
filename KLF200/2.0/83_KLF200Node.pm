@@ -419,12 +419,6 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   $NodeName = decode("UTF-8", $NodeName);  
   my $OperatingState = KLF200Node_GetText($hash, "OperatingState", $State);
   my $VelocityStr = KLF200Node_GetText($hash, "Velocity", $Velocity);
-  my $NodeTypeSubTypeStr = $hash->{Const}->{NodeTypeSubType}->{$NodeTypeSubType};
-  if (not defined($NodeTypeSubTypeStr)) {
-    my $NodeType = $NodeTypeSubType & 0xFFC0; #Match the type only.
-    $NodeTypeSubTypeStr = $hash->{Const}->{NodeTypeSubType}->{$NodeType};
-    if (not defined($NodeTypeSubTypeStr)) { $NodeTypeSubTypeStr = $NodeTypeSubType };
-  };
   my $NodeVariationStr = KLF200Node_GetText($hash, "NodeVariation", $NodeVariation);
   my $PowerModeStr = KLF200Node_GetText($hash, "PowerMode", $PowerMode);
   my $name = $hash->{NAME};
@@ -436,9 +430,8 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   KLF200Node_BulkUpdateTarget($hash, $Target);
   readingsBulkUpdateIfChanged($hash, "remaining", $RemainingTime, 1);
   readingsBulkUpdateIfChanged($hash, "name", $NodeName, 1);
-  readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1) if ($OperatingState ne "'Not used'");
+  readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1) if ($OperatingState ne "State unknown");
   readingsBulkUpdateIfChanged($hash, "velocity", $VelocityStr, 1);
-  readingsBulkUpdateIfChanged($hash, "nodeTypeSubType", $NodeTypeSubTypeStr, 1);
   readingsBulkUpdateIfChanged($hash, "nodeVariation", $NodeVariationStr, 1);
   readingsBulkUpdateIfChanged($hash, "powerMode", $PowerModeStr, 1);
   readingsBulkUpdateIfChanged($hash, "buildNumber", $BuildNumber, 1);
@@ -477,12 +470,17 @@ sub KLF200Node_GW_CS_GET_SYSTEMTABLE_DATA_NTF($$) {
         my $name = $hash->{NAME};
         my $ioManufacturer = KLF200Node_GetText($hash, "ioManufacturerId", $ioManufacturerId);
         my $NodeTypeSubTypeStr = $hash->{Const}->{NodeTypeSubType}->{$NodeTypeSubType};
-        if (not defined($NodeTypeSubTypeStr)) {
-          my $NodeType = $NodeTypeSubType & 0xFFC0; #Match the type only.
-          $NodeTypeSubTypeStr = $hash->{Const}->{NodeTypeSubType}->{$NodeType};
-          if (not defined($NodeTypeSubTypeStr)) { $NodeTypeSubTypeStr = $NodeTypeSubType };
+        my $NodeType = $NodeTypeSubType & 0xFFC0;
+        my $SubType = $NodeTypeSubType & 0x3F;
+        my $NodeTypeSubTypeNum = $NodeType / 0x40;
+        $NodeTypeSubTypeNum .= ".".$SubType if ($SubType != 0);
+        if (not defined($NodeTypeSubTypeStr)) { #Match the type only.
+          $NodeTypeSubTypeStr = $hash->{Const}->{NodeTypeSubType}->{$NodeType}; 
+          if (not defined($NodeTypeSubTypeStr)) { $NodeTypeSubTypeStr = $NodeTypeSubTypeNum };
         };
-        my $model = $ioManufacturer." ".$NodeTypeSubTypeStr;
+        my $model = $ioManufacturer;
+        $model .= " ".$NodeTypeSubTypeStr if ($NodeTypeSubTypeStr ne $NodeTypeSubTypeNum);
+        $model .= " Type ".$NodeTypeSubTypeNum;
         readingsBeginUpdate($hash);
         readingsBulkUpdateIfChanged($hash, "ioManufacturer", $ioManufacturer, 1);
         readingsBulkUpdateIfChanged($hash, "nodeTypeSubType", $NodeTypeSubTypeStr, 1);
