@@ -445,7 +445,7 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
     }
   }
   readingsEndUpdate($hash, 1);
-  $attr{$name}{alias} = $NodeName if (not defined(AttrVal($name, "alias", undef)));
+  $attr{$name}{alias} = $NodeName if ((not defined(AttrVal($name, "alias", undef))) and ($NodeName ne ""));
   return $name;
 }
 
