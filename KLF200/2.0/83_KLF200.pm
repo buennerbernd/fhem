@@ -22,7 +22,7 @@ sub KLF200_Initialize($) {
   $hash->{ReadFn}   = "KLF200_Read";
   $hash->{ReadyFn}  = "KLF200_Ready";
   $hash->{WriteFn}  = "KLF200_Write";
-  $hash->{AttrList} = "autoReboot:0,1 " . $readingFnAttributes;
+  $hash->{AttrList} = "autoReboot:0,1 velocity:DEFAULT,SILENT,FAST waitAfterWrite " . $readingFnAttributes;
   
   $hash->{parseParams}  = 1;
   $hash->{Clients} = "KLF200Node.*";
@@ -90,16 +90,46 @@ sub KLF200_InitTexts($) {
     0x81 => "Performing task in Activate Group Handler",
     0x82 => "Performing task in Activate Scene Handler",
   };
+  $hash->{Const}->{Velocity} = {
+    0 => "DEFAULT",
+    1 => "SILENT",
+    2 => "FAST",
+    255 => "VELOCITY NOT AVAILABLE",
+  }; 
+  
 }
 
 sub KLF200_GetText($$$) {
   my ($hash, $const, $id) = @_;
+  my $name = $hash->{NAME};
   
   my $text = $hash->{Const}->{$const}->{$id};
-  if (not defined($text)) {return $id};
+  if (not defined($text)) {
+    Log3($hash, 3, "KLF200 $name: Unknown $const ID: $id");
+    return $id
+  };
   
   return $text;
 }
+
+sub KLF200_GetId($$$$) {
+  my ($hash, $const, $text, $default) = @_;
+  my $name = $hash->{NAME};
+  
+  if (not defined($text)) {return $default};
+  if ($text =~ /^[0-9]+$/) {return $text};
+
+  my $idToText = $hash->{Const}->{$const};
+  my %textToId = reverse( %$idToText );   
+  my $id = $textToId{$text};
+  if(not defined($id)) {
+    Log3($hash, 3, "KLF200 $name: Unknown $const text: $text");
+    return $default
+  };
+  
+  return $id;
+}
+
 
 # called when definition is undefined 
 # (config reload, shutdown or delete of definition)
@@ -280,10 +310,6 @@ sub KLF200_Write($$) {
   my $name = $hash->{NAME};
 
   my $queue = $hash->{".queue"};
-#  if (grep $_ eq $bytes, @$queue) {
-#    Log3 ($name, 1, "KLF200 ($name) Skipped command, already in queue");
-#    return;
-#  }
   push (@$queue, $bytes);
   readingsSingleUpdate($hash, "queueSize", scalar(@$queue), 1);
   if (scalar(@$queue) == 1) {
@@ -310,6 +336,8 @@ sub KLF200_WriteDirect($$) {
     $written = "undef" if (not defined($written));
     Log3 ($name, 1, "KLF200 ($name) Error: written $written of $length bytes");
   }
+  my $waitAfterWrite = AttrVal($name, "waitAfterWrite", 0);
+  select(undef, undef, undef, $waitAfterWrite);
 
   RemoveInternalTimer($hash);
   InternalTimer( gettimeofday() + 600, "KLF200_GW_GET_STATE_REQ", $hash); #call after 10 minutes to keep alive
@@ -712,17 +740,18 @@ sub KLF200_GW_ACTIVATE_SCENE_REQ($$$) {
     Log3($hash, 1, "KLF200 ($name) KLF200_GW_ACTIVATE_SCENE_REQ undefined SceneID");
     return;
   };
-  if (not defined($Velocity)) {$Velocity = 0};
+  $Velocity = AttrVal($name, "velocity", undef) if(not defined($Velocity));
+  my $VelocityId = KLF200_GetId($hash, "Velocity", $Velocity, 0);
   my $Command = "\x04\x12";
   my $SessionID = KLF200_getNextSessionID($hash);
   my $SessionIDShort = pack("n", $SessionID);
   my $CommandOriginator = "\x08"; #SAAC Stand Alone Automatic Controls 
   my $PriorityLevel = "\05"; #Comfort Level 2 Used by Stand Alone Automatic Controls 
   my $SceneIDByte = pack("C", $SceneID);
-  my $VelocityByte = pack("C", $Velocity);
+  my $VelocityByte = pack("C", $VelocityId);
   
   my $bytes = $Command.$SessionIDShort.$CommandOriginator.$PriorityLevel.$SceneIDByte.$VelocityByte;
-  Log3($hash, 5, "KLF200 ($name) KLF200_GW_ACTIVATE_SCENE_REQ SessionID $SessionID SceneID $SceneID Velocity $Velocity");
+  Log3($hash, 5, "KLF200 ($name) KLF200_GW_ACTIVATE_SCENE_REQ SessionID $SessionID SceneID $SceneID Velocity $VelocityId");
   KLF200_Write($hash, $bytes);
 
   my $scene = $hash->{".idToScene"}->{$SceneID};  
