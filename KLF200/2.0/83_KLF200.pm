@@ -22,7 +22,7 @@ sub KLF200_Initialize($) {
   $hash->{ReadFn}   = "KLF200_Read";
   $hash->{ReadyFn}  = "KLF200_Ready";
   $hash->{WriteFn}  = "KLF200_Write";
-  $hash->{AttrList} = "autoReboot:0,1 velocity:DEFAULT,SILENT,FAST waitAfterWrite " . $readingFnAttributes;
+  $hash->{AttrList} = "autoReboot:0,1 velocity:DEFAULT,SILENT,FAST " . $readingFnAttributes;
   
   $hash->{parseParams}  = 1;
   $hash->{Clients} = "KLF200Node.*";
@@ -77,8 +77,8 @@ sub KLF200_InitTexts($) {
   };
   $hash->{Const}->{Status} = {
     0 => "OK - Request accepted",
-    1 => "Error – Invalid parameter",
-    2 => "Error – Request rejected",
+    1 => "Error - Invalid parameter",
+    2 => "Error - Request rejected",
   };
   $hash->{Const}->{SubState} = {
     0x00 => "Idle state",
@@ -214,11 +214,12 @@ sub KLF200_Set($$$) {
   elsif ($cmd eq "updateAll")      { KLF200_UpdateAll($hash) }
   elsif ($cmd eq "reboot")         { KLF200_GW_REBOOT_REQ($hash) }
   elsif ($cmd eq "closeConnection"){ DevIo_CloseDev($hash) }
-  elsif ($cmd eq "openConnection") { KLF200_Ready($hash) }    
+  elsif ($cmd eq "openConnection") { KLF200_Ready($hash) }
+  elsif ($cmd eq "clearLastError") { readingsSingleUpdate($hash, "lastError", "", 1); return undef }   
   else {
       my $sceneUsage = $hash->{".sceneUsage"};
       my $sceneIDUsage = $hash->{".sceneIDUsage"};
-      my $usage = "unknown argument $cmd, choose one of scene:$sceneUsage sceneID:$sceneIDUsage login updateNodes:noArg updateAll:noArg reboot:noArg closeConnection:noArg openConnection:noArg";
+      my $usage = "unknown argument $cmd, choose one of scene:$sceneUsage sceneID:$sceneIDUsage login updateNodes:noArg updateAll:noArg reboot:noArg closeConnection:noArg openConnection:noArg clearLastError:noArg";
       return $usage;
   }
 }
@@ -336,8 +337,6 @@ sub KLF200_WriteDirect($$) {
     $written = "undef" if (not defined($written));
     Log3 ($name, 1, "KLF200 ($name) Error: written $written of $length bytes");
   }
-  my $waitAfterWrite = AttrVal($name, "waitAfterWrite", 0);
-  select(undef, undef, undef, $waitAfterWrite);
 
   RemoveInternalTimer($hash);
   InternalTimer( gettimeofday() + 600, "KLF200_GW_GET_STATE_REQ", $hash); #call after 10 minutes to keep alive
@@ -647,7 +646,7 @@ sub KLF200_GW_GET_VERSION_CFM($$) {
     $HardwareVersion, $ProductGroup, $ProductType) 
     = unpack("H4 C C C C C C C C C", $bytes);
   my $SoftwareVersion = "$SoftwareVersion1.$SoftwareVersion2.$SoftwareVersion3.$SoftwareVersion4.$SoftwareVersion5.$SoftwareVersion6";
-  Log3($hash, 5, "KLF200 ($name) GW_GET_SCENE_LIST_CFM $commandHex $SoftwareVersion $HardwareVersion");
+  Log3($hash, 5, "KLF200 ($name) GW_GET_VERSION_CFM $commandHex $SoftwareVersion $HardwareVersion");
 
   readingsBeginUpdate($hash);
   readingsBulkUpdateIfChanged($hash, "softwareVersion", $SoftwareVersion, 1);
@@ -843,6 +842,9 @@ sub KLF200_GW_ERROR_NTF($$) {
 
   readingsSingleUpdate($hash, "lastError", $lastError, 1);
   Log3($name, 1, "KLF200 ($name) - Gateway Error: $lastError");
+  if ($lastError ne "Busy. Try again later.") {
+    KLF200_Dequeue($hash, qr/.*/, undef); #last request
+  }
   return;  
 }
 1;
