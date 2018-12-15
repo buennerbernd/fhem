@@ -1,7 +1,7 @@
 ##############################################################################
 #
 #     83_KLF200.pm
-#     Copyright by Stefan Bünnig buennerbernd
+#     Copyright by Stefan BÃ¼nnig buennerbernd
 #
 ##############################################################################
 
@@ -11,6 +11,7 @@ use strict;
 use warnings;
 use DevIo; # load DevIo.pm if not already loaded
 use Data::Dumper;
+use Encode;
 
 # called upon loading the module KLF200
 sub KLF200_Initialize($) {
