@@ -1,13 +1,14 @@
 ##############################################################################
 #
 #     83_KLF200Node.pm
-#     Copyright by Stefan Bünnig buennerbernd
+#     Copyright by Stefan BÃ¼nnig buennerbernd
 #
 ##############################################################################
 
 package main;
 use strict;
 use warnings;
+use Encode;
 
 sub KLF200Node_Initialize($) {
   my ($hash) = @_;
@@ -38,7 +39,7 @@ sub KLF200Node_Define($$) {
   my $NodeID  = $param[3];
   $hash->{NodeID} = $NodeID;
   
-  # Adresse rückwärts dem Hash zuordnen (für ParseFn)
+  # Adresse rÃ¼ckwÃ¤rts dem Hash zuordnen (fÃ¼r ParseFn)
   $modules{KLF200Node}{defptr}{$DeviceName}{$NodeID} = $hash;
 
   KLF200Node_InitTexts($hash);
@@ -167,7 +168,7 @@ sub KLF200Node_InitTexts($) {
     1 => "VELUX",
     2 => "Somfy",
     3 => "Honeywell",
-    4 => "Hörmann",
+    4 => "HÃ¶rmann",
     5 => "ASSA ABLOY",
     6 => "Niko",
     7 => "WINDOW MASTER",
