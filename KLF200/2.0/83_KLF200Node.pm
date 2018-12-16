@@ -8,6 +8,7 @@
 package main;
 use strict;
 use warnings;
+use Encode;
 
 sub KLF200Node_Initialize($) {
   my ($hash) = @_;
@@ -19,7 +20,7 @@ sub KLF200Node_Initialize($) {
   $hash->{ReadFn}     = 'KLF200Node_Read';
   $hash->{ParseFn}    = 'KLF200Node_Parse';
   
-  $hash->{AttrList}   = "disable:0,1 directionOn:up,down " . $readingFnAttributes;
+  $hash->{AttrList}   = "directionOn:up,down " . $readingFnAttributes;
   $hash->{parseParams}  = 1;
   $hash->{Match}      = ".*";
 
@@ -301,6 +302,8 @@ sub KLF200Node_PctToRaw($$) {
 sub KLF200Node_BulkUpdateStatePtc($$) {
   my ($hash, $raw) = @_; 
   my $name = $hash->{NAME};
+  
+  readingsBulkUpdateIfChanged($hash, "MP", $raw, 1);
   if ($raw > 0xC800) { Log3($hash, 5, "KLF200Node ($name) unsupported position raw $raw, keep last known position"); return; }
   my $pct = KLF200Node_RawToPct($hash, $raw);
   readingsBulkUpdateIfChanged($hash, "pct", $pct, 1);
@@ -317,6 +320,15 @@ sub KLF200Node_BulkUpdateTarget($$) {
   if ($raw > 0xC800) { Log3($hash, 5, "KLF200Node ($name) unsupported target raw $raw, keep last known target"); return; }
   my $pct = KLF200Node_RawToPct($hash, $raw);
   readingsBulkUpdateIfChanged($hash, "target", $pct, 1);
+}
+
+sub KLF200Node_BulkUpdateFP($$$) {
+  my ($hash, $fp, $raw) = @_; 
+  my $name = $hash->{NAME};
+  
+  my $readingName = "FP".$fp;
+  #Don't create useless readings
+  readingsBulkUpdate($hash, $readingName, $raw, 1) if (ReadingsVal($name, $readingName, 0xF7FF) != $raw);
 }
 
 sub KLF200Node_GetHash($$) {
@@ -350,7 +362,10 @@ sub KLF200Node_GW_COMMAND_RUN_STATUS_NTF($$) {
   readingsBeginUpdate($hash);
   if ($NodeParameter == 0) { #MP: Main Parameter
     KLF200Node_BulkUpdateStatePtc($hash, $ParameterValue);
-  };
+  }
+  else {
+    KLF200Node_BulkUpdateFP($hash, $NodeParameter, $ParameterValue);
+  }
   readingsBulkUpdateIfChanged($hash, "runStatus", $RunStatusStr, 1);
   readingsBulkUpdateIfChanged($hash, "statusReply", $StatusReplyStr, 1);
   if ($RunStatus != 2) {
@@ -374,7 +389,12 @@ sub KLF200Node_GW_COMMAND_REMAINING_TIME_NTF($$) {
   readingsBeginUpdate($hash);
   if ($NodeParameter == 0) {
     readingsBulkUpdateIfChanged($hash, "remaining", $Seconds, 1);
-  };
+  }
+  else {
+    my $readingName = "FP".$NodeParameter."remaining";
+    readingsBulkUpdateIfChanged($hash, $readingName, $Seconds, 1);
+  }
+  
   readingsEndUpdate($hash, 1);
   return $name;
 }
@@ -396,6 +416,10 @@ sub KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($$) {
   readingsBeginUpdate($hash);
   KLF200Node_BulkUpdateStatePtc($hash, $CurrentPosition);
   KLF200Node_BulkUpdateTarget($hash, $Target);
+  KLF200Node_BulkUpdateFP($hash, 1, $FP1CurrentPosition);
+  KLF200Node_BulkUpdateFP($hash, 2, $FP2CurrentPosition);
+  KLF200Node_BulkUpdateFP($hash, 3, $FP3CurrentPosition);
+  KLF200Node_BulkUpdateFP($hash, 4, $FP4CurrentPosition);
   readingsBulkUpdateIfChanged($hash, "remaining", $RemainingTime, 1);
   readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1) if ($OperatingState ne "'Not used'");
   readingsEndUpdate($hash, 1);
@@ -428,6 +452,10 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   readingsBeginUpdate($hash);
   KLF200Node_BulkUpdateStatePtc($hash, $CurrentPosition);
   KLF200Node_BulkUpdateTarget($hash, $Target);
+  KLF200Node_BulkUpdateFP($hash, 1, $FP1CurrentPosition);
+  KLF200Node_BulkUpdateFP($hash, 2, $FP2CurrentPosition);
+  KLF200Node_BulkUpdateFP($hash, 3, $FP3CurrentPosition);
+  KLF200Node_BulkUpdateFP($hash, 4, $FP4CurrentPosition);
   readingsBulkUpdateIfChanged($hash, "remaining", $RemainingTime, 1);
   readingsBulkUpdateIfChanged($hash, "name", $NodeName, 1);
   readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1) if ($OperatingState ne "State unknown");
