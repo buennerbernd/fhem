@@ -10,7 +10,7 @@ package main;
 use strict;
 use warnings;
 use DevIo; # load DevIo.pm if not already loaded
-use Data::Dumper;
+use Encode;
 
 # called upon loading the module KLF200
 sub KLF200_Initialize($) {
@@ -330,13 +330,7 @@ sub KLF200_WriteDirect($$) {
   }  
   $bytes = KLF200_WrapBytes($hash, $bytes);
   
-#  DevIo_SimpleWrite($hash, $bytes, 0);
-  my $length = length($bytes);
-  my $written = $hash->{TCPDev}->write($bytes);
-  if ($written ne $length) {
-    $written = "undef" if (not defined($written));
-    Log3 ($name, 1, "KLF200 ($name) Error: written $written of $length bytes");
-  }
+  DevIo_SimpleWrite($hash, $bytes, 0);
 
   RemoveInternalTimer($hash);
   InternalTimer( gettimeofday() + 600, "KLF200_GW_GET_STATE_REQ", $hash); #call after 10 minutes to keep alive
