@@ -10,12 +10,17 @@ Copy both ih the folder /opt/fhem/FHEM/ and restart FHEM.
 
 Define
 
-    define <name> KLF200 <host> <pwfile>
+    define <name> KLF200 <host>
 
     Example:
-        define Velux KLF200 192.168.0.66 /opt/fhem/etc/veluxpw.txt
+        define Velux KLF200 192.168.0.66
         
-The devices will be created by auto create as instances of KLF200Node.
+Once your device is defined, you have to enter the password:
+
+    set <name> login <password>
+
+As password use the Wifi password, printed at the bottom of the box. If this doesn't work, please try the password of the WebUI of the KLF200. The password will be stored obfuscated in the FHEM backend and is optional for further login calls.
+After login the devices will be created by auto create as instances of KLF200Node.
 
 The device name of the nodes will be name_NodeID, but the names from the KLF200 Web UI will be set as alias.
   
