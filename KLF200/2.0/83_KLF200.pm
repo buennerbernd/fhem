@@ -1,7 +1,7 @@
 ##############################################################################
 #
 #     83_KLF200.pm
-#     Copyright by Stefan Bünnig buennerbernd
+#     Copyright by Stefan BÃ¼nnig buennerbernd
 #
 ##############################################################################
 
@@ -756,6 +756,7 @@ sub KLF200_GW_ACTIVATE_SCENE_REQ($$$) {
   else {
     readingsBulkUpdate($hash, "scene", "\"".$scene."\"", 1);  
   };
+  readingsBulkUpdate($hash, "sceneSessionID", $SessionID, 1);
   readingsEndUpdate($hash, 1);
   return;
 }
@@ -766,7 +767,7 @@ sub KLF200_GW_ACTIVATE_SCENE_CFM($$) {
   my ($commandHex, $Status, $SessionID) = unpack("H4 C n", $bytes);
   Log3($hash, 5, "KLF200 ($name) GW_ACTIVATE_SCENE_CFM $commandHex $Status, $SessionID");
 
-  my $sceneStatus = "Session ". $SessionID . ": " . KLF200_GetText($hash, "Status", $Status);
+  my $sceneStatus = KLF200_GetText($hash, "Status", $Status);
 
   readingsSingleUpdate($hash, "sceneStatus", $sceneStatus, 1);
   
