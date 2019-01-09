@@ -1,7 +1,9 @@
 ##############################################################################
 #
-#     83_KLF200.pm
-#     Copyright by Stefan Bünnig buennerbernd
+# 83_KLF200.pm
+# Copyright by Stefan Bünnig buennerbernd
+#
+# $Id: 83_KLF200.pm 2.0.10 2019-01-09 10:10:10Z buennerbernd $
 #
 ##############################################################################
 
@@ -22,7 +24,7 @@ sub KLF200_Initialize($) {
   $hash->{ReadFn}   = "KLF200_Read";
   $hash->{ReadyFn}  = "KLF200_Ready";
   $hash->{WriteFn}  = "KLF200_Write";
-  $hash->{AttrList} = "autoReboot:0,1 velocity:DEFAULT,SILENT,FAST " . $readingFnAttributes;
+  $hash->{AttrList} = "autoReboot:0,1 velocity:DEFAULT,SILENT,FAST controlNames " . $readingFnAttributes;
   
   $hash->{parseParams}  = 1;
   $hash->{Clients} = "KLF200Node.*";
@@ -67,7 +69,7 @@ sub KLF200_Define($$) {
 sub KLF200_InitTexts($) {
   my ($hash) = @_;
    
-  $hash->{Const}->{ErrorNumber} = {
+  $hash->{".Const"}->{ErrorNumber} = {
     0 => "Not further defined error.",
     1 => "Unknown Command or command is not accepted at this state.",
     3 => "ERROR on Frame Structure.",
@@ -75,12 +77,12 @@ sub KLF200_InitTexts($) {
     8 => "Bad system table index.",
     12 => "Not authenticated.",
   };
-  $hash->{Const}->{Status} = {
+  $hash->{".Const"}->{Status} = {
     0 => "OK - Request accepted",
     1 => "Error - Invalid parameter",
     2 => "Error - Request rejected",
   };
-  $hash->{Const}->{SubState} = {
+  $hash->{".Const"}->{SubState} = {
     0x00 => "Idle state",
     0x01 => "Performing task in Configuration Service handler",
     0x02 => "Performing Scene Configuration",
@@ -90,12 +92,24 @@ sub KLF200_InitTexts($) {
     0x81 => "Performing task in Activate Group Handler",
     0x82 => "Performing task in Activate Scene Handler",
   };
-  $hash->{Const}->{Velocity} = {
+  $hash->{".Const"}->{Velocity} = {
     0 => "DEFAULT",
     1 => "SILENT",
     2 => "FAST",
     255 => "VELOCITY NOT AVAILABLE",
   }; 
+  $hash->{".Const"}->{CommandOriginator} = {
+    1 => "User Remote control",
+    2 => "Rain sensor",
+    3 => "Timer controlled",
+    5 => "UPS unit",
+    8 => "Stand Alone Automatic Controls",
+    9 => "Wind sensor",
+    11 => "Electric load shed",
+    12 => "Local light sensor",
+    13 => "Unknown sensor",
+    255 => "Emergency or security commands",
+  };
   
 }
 
@@ -103,7 +117,7 @@ sub KLF200_GetText($$$) {
   my ($hash, $const, $id) = @_;
   my $name = $hash->{NAME};
   
-  my $text = $hash->{Const}->{$const}->{$id};
+  my $text = $hash->{".Const"}->{$const}->{$id};
   if (not defined($text)) {
     Log3($hash, 3, "KLF200 $name: Unknown $const ID: $id");
     return $id
@@ -119,7 +133,7 @@ sub KLF200_GetId($$$$) {
   if (not defined($text)) {return $default};
   if ($text =~ /^[0-9]+$/) {return $text};
 
-  my $idToText = $hash->{Const}->{$const};
+  my $idToText = $hash->{".Const"}->{$const};
   my %textToId = reverse( %$idToText );   
   my $id = $textToId{$text};
   if(not defined($id)) {
@@ -188,8 +202,10 @@ sub KLF200_Read($) {
   elsif ($command eq "\x03\x01") { KLF200_GW_COMMAND_SEND_CFM($hash, $bytes) }
   elsif ($command eq "\x03\x02") { KLF200_DispatchToNode($hash, $bytes) }
   elsif ($command eq "\x03\x03") { KLF200_DispatchToNode($hash, $bytes) }
+  elsif ($command eq "\x03\x07") { KLF200_DispatchToNode($hash, $bytes) }
   elsif ($command eq "\x02\x11") { KLF200_DispatchToNode($hash, $bytes) }
   elsif ($command eq "\x02\x04") { KLF200_DispatchToNode($hash, $bytes) }
+  elsif ($command eq "\x02\x10") { KLF200_DispatchToNode($hash, $bytes) }
   elsif ($command eq "\x01\x02") { KLF200_DispatchToNode($hash, $bytes) }
   else  { Log3($name, 1, "KLF200 ($name) - ignored:  $hexString") }     
 }
@@ -241,6 +257,18 @@ sub KLF200_Callback($$) {
     Log3($name, 5, "KLF200 ($name) - error while connecting: $error"); 
   }
   return undef; 
+}
+
+sub KLF200_Attr($$$$)
+{
+  my ( $cmd, $name, $attrName, $attrValue  ) = @_;
+  
+  if ($attrName eq "controlNames") {
+    if ($cmd eq "set") {
+#Todo
+#      my %hash = map{split /\:/, $_}(split /;/, $string);
+    }
+  }
 }
 
 sub KLF200_UpdateAll($) {
@@ -454,6 +482,44 @@ sub KLF200_getNextSessionID($) {
   if ($SessionID > 65535) {$SessionID = 1};
   readingsSingleUpdate($hash, "sessionID", $SessionID, 1);
   return $SessionID;
+}
+
+sub KLF200_getControlName($$$) {
+  my ($hash, $masterExecutionAddress, $commandOriginator) = @_;
+  my $name = $hash->{NAME};
+  
+  my $controlId = $masterExecutionAddress."-".$commandOriginator;
+  my $controlNamesAttr = AttrVal($name, "controlNames", "");
+  my %controlNames = map{split /\:/, $_}(split /,/, $controlNamesAttr);
+  
+  my $controlName = $controlNames{$controlId};
+  return $controlName if (defined($controlName));
+  
+  my $klf200Address = ReadingsVal($name, "address", undef);
+  if ((not defined($klf200Address)) and ($commandOriginator == 8)) {
+    #guess $masterExecutionAddress is klf200Address
+    $klf200Address = $masterExecutionAddress;
+    readingsSingleUpdate($hash, "address", $klf200Address, 1);
+  }
+  if ($klf200Address eq $masterExecutionAddress) {
+    KLF200_addControlName($hash, $klf200Address."-1", "KLF200 Input");
+    KLF200_addControlName($hash, $klf200Address."-8", "FHEM");
+    return "FHEM" if ($commandOriginator == 8);
+    return "KLF200 Input" if ($commandOriginator == 1);
+  }
+  $controlName = KLF200_GetText($hash, "CommandOriginator", $commandOriginator);
+  #persist only if klf200Address is already known
+  KLF200_addControlName($hash, $controlId, $controlName) if (defined($klf200Address));
+  return $controlName; 
+}
+
+sub KLF200_addControlName($$$) {
+  my ($hash, $controlId, $controlName) = @_;
+  my $name = $hash->{NAME};
+  my $controlNamesAttr = AttrVal($name, "controlNames", "");
+  $controlNamesAttr .= "," if ($controlNamesAttr ne "");
+  $controlNamesAttr .= $controlId.":".$controlName;
+  $attr{$name}{"controlNames"} = $controlNamesAttr;
 }
 
 sub KLF200_connectionBroken($) {
@@ -784,7 +850,7 @@ sub KLF200_GW_SESSION_FINISHED_NTF($$) {
   my ($commandHex, $SessionID) = unpack("H4 n", $bytes);
   Log3($hash, 5, "KLF200 ($name) GW_SESSION_FINISHED_NTF $commandHex $SessionID");
   
-  KLF200_Dequeue($hash, qr/^\x04\x12/, $SessionID); #GW_ACTIVATE_SCENE_REQ
+  KLF200_Dequeue($hash, qr/^(\x04\x12|\x03\x05)/, $SessionID); #GW_ACTIVATE_SCENE_REQ, GW_STATUS_REQUEST_REQ
   return;  
 }
 

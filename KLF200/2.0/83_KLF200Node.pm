@@ -1,7 +1,9 @@
 ##############################################################################
 #
-#     83_KLF200Node.pm
-#     Copyright by Stefan Bünnig buennerbernd
+# 83_KLF200Node.pm
+# Copyright by Stefan Bünnig buennerbernd
+#
+# $Id: 83_KLF200.pm 2.0.10 2019-01-09 10:10:10Z buennerbernd $
 #
 ##############################################################################
 
@@ -50,7 +52,7 @@ sub KLF200Node_Define($$) {
 sub KLF200Node_InitTexts($) {
   my ($hash) = @_;
    
-  $hash->{Const}->{OperatingState} = {
+  $hash->{".Const"}->{OperatingState} = {
     0 => "Non executing",
     1 => "Error while execution",
     2 => "'Not used'",
@@ -59,12 +61,12 @@ sub KLF200Node_InitTexts($) {
     5 => "Done",
     255 => "State unknown",
   };
-  $hash->{Const}->{RunStatus} = {
+  $hash->{".Const"}->{RunStatus} = {
     0 => "EXECUTION COMPLETED",
     1 => "EXECUTION FAILED",
     2 => "EXECUTION ACTIVE",
   };
-  $hash->{Const}->{StatusReply} = {
+  $hash->{".Const"}->{StatusReply} = {
     0x00 => "UNKNOWN STATUS REPLY",
     0x01 => "COMMAND COMPLETED OK",
     0x02 => "NO CONTACT",
@@ -110,13 +112,13 @@ sub KLF200Node_InitTexts($) {
     0xED => "LIMITATION BY AUTOMATIC CYCLE",
     0xEE => "LIMITATION BY EMERGENCY",
   };
-  $hash->{Const}->{Velocity} = {
+  $hash->{".Const"}->{Velocity} = {
     0 => "DEFAULT",
     1 => "SILENT",
     2 => "FAST",
     255 => "VELOCITY NOT AVAILABLE",
   }; 
-  $hash->{Const}->{NodeTypeSubType} = {
+  $hash->{".Const"}->{NodeTypeSubType} = {
     0x0040 => "Interior Venetian Blind",
     0x0080 => "Roller Shutter",
     0x0081 => "Adjustable slats rolling shutter",
@@ -153,18 +155,18 @@ sub KLF200Node_InitTexts($) {
     0x0600 => "Swinging Shutters",
     0x0601 => "Swinging Shutter with independent handling of the leaves",
   }; 
-  $hash->{Const}->{NodeVariation} = {
+  $hash->{".Const"}->{NodeVariation} = {
     0 => "NOT SET",
     1 => "TOPHUNG",
     2 => "KIP",
     3 => "FLAT ROOF",
     4 => "SKY LIGHT",
   };
-  $hash->{Const}->{PowerMode} = {
+  $hash->{".Const"}->{PowerMode} = {
     0 => "ALWAYS ALIVE",
     1 => "LOW POWER MODE",
   };
-  $hash->{Const}->{ioManufacturerId} = {
+  $hash->{".Const"}->{ioManufacturerId} = {
     1 => "VELUX",
     2 => "Somfy",
     3 => "Honeywell",
@@ -178,7 +180,7 @@ sub KLF200Node_InitTexts($) {
     11 => "OVERKIZ",
     12 => "Atlantic Group",
   };
-  $hash->{Const}->{StatusID} = {
+  $hash->{".Const"}->{StatusID} = {
     0x01 => "USER",
     0x02 => "RAIN",
     0x03 => "TIMER",
@@ -190,6 +192,24 @@ sub KLF200Node_InitTexts($) {
     0x0C => "EMERGENCY",
     0xFF => "UNKNOWN",
   };
+  $hash->{".Const"}->{CommandOriginator} = {
+    1 => "USER",
+    2 => "RAIN",
+    3 => "TIMER",
+    5 => "UPS",
+    8 => "SAAC",
+    9 => "WIND",
+    11 => "LOAD_SHEDDING",
+    12 => "LOCAL_LIGHT",
+    13 => "UNSPECIFIC_ENVIRONMENT_SENSOR",
+    255 => "EMERGENCY",
+  };
+  $hash->{".Const"}->{StatusType} = {
+    0 => "Target_position",
+    1 => "Current_position",
+    2 => "Remaining_time",
+    3 => "Main_info",
+  };
    
   return;
 }
@@ -198,7 +218,7 @@ sub KLF200Node_GetText($$$) {
   my ($hash, $const, $id) = @_;
   my $name = $hash->{NAME};
   
-  my $text = $hash->{Const}->{$const}->{$id};
+  my $text = $hash->{".Const"}->{$const}->{$id};
   if (not defined($text)) {
     Log3($hash, 3, "KLF200 $name: Unknown $const ID: $id");
     return $id
@@ -214,7 +234,7 @@ sub KLF200Node_GetId($$$$) {
   if (not defined($text)) {return $default};
   if ($text =~ /^[0-9]+$/) {return $text};
 
-  my $idToText = $hash->{Const}->{$const};
+  my $idToText = $hash->{".Const"}->{$const};
   my %textToId = reverse( %$idToText );   
   my $id = $textToId{$text};
   if(not defined($id)) {
@@ -257,7 +277,7 @@ sub KLF200Node_Set($$$) {
     my $velocity = shift @a;
     return KLF200Node_SetState($hash, $value, $velocity);
   }
-  if ($cmd =~ /^[0-9]+$|on|off|up|down|stop/) {
+  if ($cmd =~ /^([0-9]+|on|off|up|down|stop)$/) {
     my $velocity = shift @a;
     return KLF200Node_SetState($hash, $cmd, $velocity);
   }
@@ -265,13 +285,22 @@ sub KLF200Node_Set($$$) {
     my $velocity = shift @a;
     my $value;
     if    (ReadingsVal($hash->{NAME}, "operatingState", "") eq "Executing") { $value = "stop" }
-    elsif (ReadingsVal($hash->{NAME}, "pct", "") < 50)                      { $value = 100 }
+    elsif (ReadingsVal($hash->{NAME}, "pct", 0) < 50)                       { $value = 100 }
     else                                                                    { $value = 0 }
     return KLF200Node_SetState($hash, $value, $velocity);
+  }
+  if ($cmd eq "target") { 
+    return KLF200Node_SetState($hash, "target", "DEFAULT");
+  }
+  if ($cmd eq "statusRequest") {
+    my $statusType = shift @a; 
+    return KLF200Node_GW_STATUS_REQUEST_REQ($hash, $statusType);
   }
   my $usage= "Unknown argument $cmd, choose one of";
   $usage .= " on:noArg off:noArg toggle:noArg up:noArg down:noArg stop:noArg" ;
   $usage .= " pct:slider,0,1,100" ;
+  $usage .= " statusRequest:Main_info,Target_position,Current_position,Remaining_time" ;
+#  $usage .= " target:noArg" ;
   return $usage;
 }
 
@@ -283,6 +312,7 @@ sub KLF200Node_SetState($$$) {
   if    ($state eq "stop") { $raw = 0xD200 }
   elsif ($state eq "up")   { $raw = 0x0000 }
   elsif ($state eq "down") { $raw = 0xC800 }
+  elsif ($state eq "target") { $raw = 0xD100 }
   elsif ($state eq "on")   { $raw = KLF200Node_PctToRaw($hash, 100) }
   elsif ($state eq "off")  { $raw = KLF200Node_PctToRaw($hash, 0) }
   else                     { $raw = KLF200Node_PctToRaw($hash, $state) }
@@ -303,6 +333,8 @@ sub KLF200Node_Parse ($$)
   elsif ($command eq "\x03\x03") { return KLF200Node_GW_COMMAND_REMAINING_TIME_NTF($io_hash, $bytes) }
   elsif ($command eq "\x02\x11") { return KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($io_hash, $bytes) }
   elsif ($command eq "\x02\x04") { return KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($io_hash, $bytes) }
+  elsif ($command eq "\x02\x10") { return KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($io_hash, $bytes) }
+  elsif ($command eq "\x03\x07") { return KLF200Node_GW_STATUS_REQUEST_NTF($io_hash, $bytes) }
   elsif ($command eq "\x01\x02") { return KLF200Node_GW_CS_GET_SYSTEMTABLE_DATA_NTF($io_hash, $bytes) }
   else  { Log3($io_name, 1, "KLF200Node ($io_name) - ignored:  $hexString"); return undef; }
 }
@@ -313,10 +345,10 @@ sub KLF200Node_RawToPct($$) {
   my $pct;
   my $directionOn = AttrVal($name, "directionOn", "up");
   if ($directionOn eq "up") { 
-    $pct = int(100 - ($raw / 512)); 
+    $pct = int(100.5 - ($raw / 512)); 
   }
   else { 
-    $pct = int($raw / 512); 
+    $pct = int($raw / 512 + 0.5); 
   }
   return $pct;
 }
@@ -337,11 +369,11 @@ sub KLF200Node_PctToRaw($$) {
   return $raw;
 }
 
-sub KLF200Node_BulkUpdateStatePtc($$) {
+sub KLF200Node_BulkUpdateStatePct($$) {
   my ($hash, $raw) = @_; 
   my $name = $hash->{NAME};
   
-  readingsBulkUpdateIfChanged($hash, "MP", $raw, 1);
+  my $changed = readingsBulkUpdateIfChanged($hash, "MP", $raw, 1);
   if ($raw > 0xC800) { Log3($hash, 5, "KLF200Node ($name) unsupported position raw $raw, keep last known position"); return; }
   my $pct = KLF200Node_RawToPct($hash, $raw);
   readingsBulkUpdateIfChanged($hash, "pct", $pct, 1);
@@ -350,6 +382,7 @@ sub KLF200Node_BulkUpdateStatePtc($$) {
   elsif ($pct == 0) { $state = "off" }
   else { $state = $pct }
   readingsBulkUpdateIfChanged($hash, "state", $state, 1);
+  return $changed;
 }
 
 sub KLF200Node_BulkUpdateTarget($$) {
@@ -358,6 +391,21 @@ sub KLF200Node_BulkUpdateTarget($$) {
   if ($raw > 0xC800) { Log3($hash, 5, "KLF200Node ($name) unsupported target raw $raw, keep last known target"); return; }
   my $pct = KLF200Node_RawToPct($hash, $raw);
   readingsBulkUpdateIfChanged($hash, "target", $pct, 1);
+}
+
+sub KLF200Node_BulkUpdateRemaining($$) {
+  my ($hash, $remaining) = @_; 
+  my $name = $hash->{NAME};
+  readingsBulkUpdateIfChanged($hash, "remaining", $remaining, 1);
+  if ($remaining == 0) {
+    return undef;
+  }
+  my $targetArrival = gettimeofday() + $remaining;
+  my $targetArrivalStr = FmtDateTime($targetArrival);
+  if (defined(readingsBulkUpdateIfChanged($hash, "targetArrival", $targetArrivalStr, 1))) {
+    return $targetArrival;
+  }
+  return undef;
 }
 
 sub KLF200Node_BulkUpdateFP($$$) {
@@ -398,9 +446,16 @@ sub KLF200Node_GW_COMMAND_RUN_STATUS_NTF($$) {
   my $SessionStatusOwner = KLF200Node_GetText($hash, "StatusID", $StatusID);
   my $SessionRunStatus = KLF200Node_GetText($hash, "RunStatus", $RunStatus);
   my $SessionStatusReply = KLF200Node_GetText($hash, "StatusReply", $StatusReply);
+  my $LastCommandOriginator = 8;
+  my $LastCommandOriginatorStr = KLF200Node_GetText($hash, "CommandOriginator", $LastCommandOriginator);
+  my $LastMasterExecutionAddress = ReadingsVal($io_hash->{NAME}, "address", "UNKNOWN");
+  my $LastControl;
+  if ($LastMasterExecutionAddress eq "UNKNOWN") { $LastControl = "FHEM" }
+  else { $LastControl = KLF200_getControlName($io_hash, $LastMasterExecutionAddress, $LastCommandOriginator) }
+  
   readingsBeginUpdate($hash);
   if ($NodeParameter == 0) { #MP: Main Parameter
-    KLF200Node_BulkUpdateStatePtc($hash, $ParameterValue);
+    KLF200Node_BulkUpdateStatePct($hash, $ParameterValue);
   }
   else {
     KLF200Node_BulkUpdateFP($hash, $NodeParameter, $ParameterValue);
@@ -410,10 +465,18 @@ sub KLF200Node_GW_COMMAND_RUN_STATUS_NTF($$) {
   readingsBulkUpdateIfChanged($hash, "sessionRunStatus", $SessionRunStatus, 1);
   readingsBulkUpdateIfChanged($hash, "sessionStatusReply", $SessionStatusReply, 1);
   readingsBulkUpdateIfChanged($hash, "sessionInformationCode", $InformationCode, 1);
+  readingsBulkUpdateIfChanged($hash, "lastMasterExecutionAddress", $LastMasterExecutionAddress, 1);
+  readingsBulkUpdateIfChanged($hash, "lastControl", $LastControl, 1);
+  readingsBulkUpdateIfChanged($hash, "lastCommandOriginator", $LastCommandOriginatorStr, 1);
   if ($RunStatus != 2) {
-    readingsBulkUpdateIfChanged($hash, "remaining", 0, 1);
+    KLF200Node_BulkUpdateRemaining($hash, 0);
   }
   readingsEndUpdate($hash, 1);
+  
+  if (($LastMasterExecutionAddress eq "UNKNOWN") and ($RunStatus != 2)) {
+    #determine the address of KLF200
+    KLF200Node_GW_STATUS_REQUEST_REQ($hash, "Main_info");
+  }
   return $name;
 }
 
@@ -430,7 +493,7 @@ sub KLF200Node_GW_COMMAND_REMAINING_TIME_NTF($$) {
   Log3($hash, 5, "KLF200Node ($name) GW_COMMAND_REMAINING_TIME_NTF $commandHex $SessionID $NodeID FP$NodeParameter = $Seconds");
   readingsBeginUpdate($hash);
   if ($NodeParameter == 0) {
-    readingsBulkUpdateIfChanged($hash, "remaining", $Seconds, 1);
+    KLF200Node_BulkUpdateRemaining($hash, $Seconds);
   }
   else {
     my $readingName = "FP".$NodeParameter."remaining";
@@ -456,16 +519,33 @@ sub KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($$) {
   Log3($hash, 5, "KLF200Node ($name) GW_NODE_STATE_POSITION_CHANGED_NTF $commandHex $NodeID $State FP0:$CurrentPosition T:$Target FP1:$FP1CurrentPosition $RemainingTime $TimeStamp");
   my $OperatingState = KLF200Node_GetText($hash, "OperatingState", $State);
   readingsBeginUpdate($hash);
-  KLF200Node_BulkUpdateStatePtc($hash, $CurrentPosition);
+  my $changed = KLF200Node_BulkUpdateStatePct($hash, $CurrentPosition);
   KLF200Node_BulkUpdateTarget($hash, $Target);
   KLF200Node_BulkUpdateFP($hash, 1, $FP1CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 2, $FP2CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 3, $FP3CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 4, $FP4CurrentPosition);
-  readingsBulkUpdateIfChanged($hash, "remaining", $RemainingTime, 1);
+  KLF200Node_BulkUpdateRemaining($hash, $RemainingTime);
   readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1) if ($OperatingState ne "'Not used'");
   readingsEndUpdate($hash, 1);
+  if(defined($changed) and (ReadingsVal($name, "sessionRunStatus", "") ne "EXECUTION ACTIVE")) {
+    #Otherwhise it could destroy a running session
+    KLF200Node_GW_STATUS_REQUEST_REQ($hash, "Main_info");
+  }
   return $name;
+}
+
+sub KLF200Node_GW_GET_NODE_INFORMATION_REQ($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};    
+  my $Command = "\x02\x00";
+  my $NodeId = $hash->{NodeID};
+  Log3($hash, 5, "KLF200Node ($name) KLF200Node_GW_GET_NODE_INFORMATION_REQ");
+
+  my $NodeIdByte = pack("C", $NodeId);
+
+  my $bytes = $Command.$NodeIdByte;
+  return IOWrite($hash, $bytes);
 }
 
 sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
@@ -492,13 +572,13 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   my $Serial = "$Serial1 $Serial2 $Serial3 $Serial4 $Serial5 $Serial6";
   Log3($hash, 5, "KLF200Node ($name) GW_GET_ALL_NODES_INFORMATION_NTF $commandHex $NodeID $NodeName $State FP0:$CurrentPosition T:$Target FP1:$FP1CurrentPosition V:$Velocity $RemainingTime $klf200Time");
   readingsBeginUpdate($hash);
-  KLF200Node_BulkUpdateStatePtc($hash, $CurrentPosition);
+  KLF200Node_BulkUpdateStatePct($hash, $CurrentPosition);
   KLF200Node_BulkUpdateTarget($hash, $Target);
   KLF200Node_BulkUpdateFP($hash, 1, $FP1CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 2, $FP2CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 3, $FP3CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 4, $FP4CurrentPosition);
-  readingsBulkUpdateIfChanged($hash, "remaining", $RemainingTime, 1);
+  KLF200Node_BulkUpdateRemaining($hash, $RemainingTime);
   readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1) if ($OperatingState ne "State unknown");
   readingsBulkUpdateIfChanged($hash, "velocity", $VelocityStr, 1);
   readingsBulkUpdateIfChanged($hash, "nodeVariation", $NodeVariationStr, 1);
@@ -506,6 +586,8 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
     $attr{$name}{alias} = $NodeName if ($NodeName ne ""); #only if name has changed and is not empty   
   }
   readingsBulkUpdateIfChanged($hash, "powerMode", $PowerModeStr, 1);
+  readingsBulkUpdateIfChanged($hash, "productGroup", $ProductGroup, 1);  
+  readingsBulkUpdateIfChanged($hash, "productType", $ProductType, 1);  
   readingsBulkUpdateIfChanged($hash, "buildNumber", $BuildNumber, 1);
   if (defined(readingsBulkUpdateIfChanged($hash, "serial", $Serial, 1))) {
     my $year = 2000 + $Serial4;
@@ -517,6 +599,9 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
     }
   }
   readingsEndUpdate($hash, 1);
+  if ($commandHex eq "0210") {
+    KLF200_Dequeue($io_hash, qr/^\x02\x00/, undef);
+  }
   return $name;
 }
 
@@ -540,13 +625,13 @@ sub KLF200Node_GW_CS_GET_SYSTEMTABLE_DATA_NTF($$) {
       else {
         my $name = $hash->{NAME};
         my $ioManufacturer = KLF200Node_GetText($hash, "ioManufacturerId", $ioManufacturerId);
-        my $NodeTypeSubTypeStr = $hash->{Const}->{NodeTypeSubType}->{$NodeTypeSubType};
+        my $NodeTypeSubTypeStr = $hash->{".Const"}->{NodeTypeSubType}->{$NodeTypeSubType};
         my $NodeType = $NodeTypeSubType & 0xFFC0;
         my $SubType = $NodeTypeSubType & 0x3F;
         my $NodeTypeSubTypeNum = $NodeType / 0x40;
         $NodeTypeSubTypeNum .= ".".$SubType if ($SubType != 0);
         if (not defined($NodeTypeSubTypeStr)) { #Match the type only.
-          $NodeTypeSubTypeStr = $hash->{Const}->{NodeTypeSubType}->{$NodeType}; 
+          $NodeTypeSubTypeStr = $hash->{".Const"}->{NodeTypeSubType}->{$NodeType}; 
           if (not defined($NodeTypeSubTypeStr)) { $NodeTypeSubTypeStr = $NodeTypeSubTypeNum };
         };
         my $model = $ioManufacturer;
@@ -556,9 +641,14 @@ sub KLF200Node_GW_CS_GET_SYSTEMTABLE_DATA_NTF($$) {
         readingsBulkUpdateIfChanged($hash, "ioManufacturer", $ioManufacturer, 1);
         readingsBulkUpdateIfChanged($hash, "nodeTypeSubType", $NodeTypeSubTypeStr, 1);
         readingsBulkUpdateIfChanged($hash, "model", $model, 1);
+        readingsBulkUpdateIfChanged($hash, "actuatorAddress", $ActuatorAddress, 1);
+        readingsBulkUpdateIfChanged($hash, "backboneReferenceNumber", $BackboneReferenceNumber, 1);
         readingsEndUpdate($hash, 1);
         $result = $name if (not defined($result));
       }
+    }
+    else {
+      Log3($io_hash, 3, "KLF200Node ($io_name) GW_CS_GET_SYSTEMTABLE_DATA_NTF $commandHex ignored $NodeID $ActuatorAddress $NodeTypeSubType $Bits $ioManufacturerId $BackboneReferenceNumber");
     }
   }
   my $offset = 3 + $NumberOfEntry * 11;
@@ -609,6 +699,87 @@ sub KLF200Node_GW_COMMAND_SEND_REQ($$$) {
   my $bytes = $Command.$SessionIDShort.$CommandOriginator.$PriorityLevel.$ParameterActive.$FPI1FPI2
     .$FunctionalParameterValueArray.$IndexArrayCount.$IndexArray.$PriorityLevelLock;
   return IOWrite($hash, $bytes);
+}
+
+sub KLF200Node_GW_STATUS_REQUEST_REQ($$) {
+  my ($hash, $statusType) = @_;
+  my $name = $hash->{NAME};    
+  my $NodeId = $hash->{NodeID};
+  my $Command = "\x03\x05";
+  my $StatusTypeId = KLF200Node_GetId($hash, "StatusType", $statusType, 3);
+  my $SessionID = 0;
+  my $io_hash = $hash->{IODev};
+  if (defined($io_hash)) {$SessionID = KLF200_getNextSessionID($io_hash)};
+  Log3($hash, 5, "KLF200Node ($name) KLF200Node_GW_STATUS_REQUEST_REQ SessionID $SessionID StatusType $StatusTypeId");
+  my $SessionIDShort = pack("n", $SessionID);
+  my $IndexArrayCount = pack("C", 1);
+  my $IndexArray = pack("Cx19", $NodeId);
+  my $StatusTypeByte = pack("C", $StatusTypeId);
+  my $FPI1FPI2 = "\x00\x00";
+  if ($StatusTypeId != 3) {
+    $FPI1FPI2 = "\xFE\x00"; #request FP1 - FP7
+  }
+  my $bytes = $Command.$SessionIDShort.$IndexArrayCount.$IndexArray.$StatusTypeByte.$FPI1FPI2;
+  return IOWrite($hash, $bytes);
+}
+
+sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
+  my ($io_hash, $bytes) = @_;
+
+  my ($commandHex, $SessionID, $StatusID, $NodeID, $RunStatus, $StatusReply, $StatusType) 
+    = unpack("H4 n C C C C C", $bytes);
+    
+  my ($hash, $undefined) = KLF200Node_GetHash($io_hash, $NodeID);
+  if (not defined($hash)) {return $undefined};
+
+  my $name = $hash->{NAME};
+  Log3($hash, 5, "KLF200Node ($name) GW_STATUS_REQUEST_NTF $commandHex $SessionID $StatusID $NodeID $RunStatus $StatusReply $StatusType");
+
+  my $SessionStatusOwner = KLF200Node_GetText($hash, "StatusID", $StatusID);
+  my $SessionRunStatus = KLF200Node_GetText($hash, "RunStatus", $RunStatus);
+  my $SessionStatusReply = KLF200Node_GetText($hash, "StatusReply", $StatusReply);
+  my $targetArrival;
+  readingsBeginUpdate($hash);
+  readingsBulkUpdateIfChanged($hash, "sessionID", $SessionID, 1);
+  readingsBulkUpdateIfChanged($hash, "sessionStatusOwner", $SessionStatusOwner, 1);
+  readingsBulkUpdateIfChanged($hash, "sessionRunStatus", $SessionRunStatus, 1);
+  readingsBulkUpdateIfChanged($hash, "sessionStatusReply", $SessionStatusReply, 1);
+  
+  if($StatusType == 3) {
+    my ($TargetPosition, $CurrentPosition, $RemainingTime, $LastMasterExecutionAddress, $LastCommandOriginator)
+      = unpack("n n n H6x C", substr($bytes, 9));
+    
+    my $LastCommandOriginatorStr = KLF200Node_GetText($hash, "CommandOriginator", $LastCommandOriginator);
+    my $LastControl = KLF200_getControlName($io_hash, $LastMasterExecutionAddress, $LastCommandOriginator);
+    KLF200Node_BulkUpdateTarget($hash, $TargetPosition);   
+    KLF200Node_BulkUpdateStatePct($hash, $CurrentPosition);  
+    $targetArrival = KLF200Node_BulkUpdateRemaining($hash, $RemainingTime);
+    readingsBulkUpdateIfChanged($hash, "lastMasterExecutionAddress", $LastMasterExecutionAddress, 1);
+    readingsBulkUpdateIfChanged($hash, "lastCommandOriginator", $LastCommandOriginatorStr, 1);
+    readingsBulkUpdateIfChanged($hash, "lastControl", $LastControl, 1);
+  }
+  else {
+    my $StatusCount = unpack("C", substr($bytes, 9, 1));
+    for (my $i = 0; $i < $StatusCount; $i++) {
+      my $offset = 10 + $i * 3;
+      my $ParameterData = substr($bytes, $offset, 3);
+      my ($NodeParameter, $ParameterValue) = unpack("C n", $ParameterData);
+      if($NodeParameter == 0) {
+        if   ($StatusType == 0) { KLF200Node_BulkUpdateTarget($hash, $ParameterValue) }
+        elsif($StatusType == 1) { KLF200Node_BulkUpdateStatePct($hash, $ParameterValue) }
+        elsif($StatusType == 2) { $targetArrival = KLF200Node_BulkUpdateRemaining($hash, $ParameterValue) }
+      }
+      else {
+        KLF200Node_BulkUpdateFP($hash, $NodeParameter, $ParameterValue);
+      }
+    }
+  }
+  readingsEndUpdate($hash, 1);
+  if(defined($targetArrival)) {
+    RemoveInternalTimer($hash, "KLF200Node_GW_STATUS_REQUEST_REQ");
+    InternalTimer( $targetArrival, "KLF200Node_GW_STATUS_REQUEST_REQ", $hash, 3);
+  }     
+  return $name;
 }
 
 1;
