@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 30065 2019-10-01 09:37:03 buennerbernd $
+# $Id: 83_KLF200Node.pm 29539 2019-10-01 10:36:25 buennerbernd $
 #
 ##############################################################################
 
@@ -782,5 +782,17 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
   return $name;
 }
 
-
 1;
+
+=pod
+=item device
+=item summary    represents an io-homecontrol device connected to Velux KLF200
+=item summary_DE represents an io-homecontrol device connected to Velux KLF200
+=begin html
+
+<a name="KLF200Node"></a>
+<h3>KLF200Node</h3>
+<ul>
+<ul>
+=end html
+=cut
