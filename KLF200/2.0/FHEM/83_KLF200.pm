@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 32039 2019-10-01 11:00:17 buennerbernd $
+# $Id: 83_KLF200.pm 34096 2019-10-01 13:55:15 buennerbernd $
 #
 ##############################################################################
 
@@ -229,13 +229,11 @@ sub KLF200_Set($$$) {
   elsif ($cmd eq "updateNodes")    { KLF200_GW_GET_ALL_NODES_INFORMATION_REQ($hash) }
   elsif ($cmd eq "updateAll")      { KLF200_UpdateAll($hash) }
   elsif ($cmd eq "reboot")         { KLF200_GW_REBOOT_REQ($hash) }
-  elsif ($cmd eq "closeConnection"){ DevIo_CloseDev($hash) }
-  elsif ($cmd eq "openConnection") { KLF200_Ready($hash) }
   elsif ($cmd eq "clearLastError") { readingsSingleUpdate($hash, "lastError", "", 1); return undef }   
   else {
       my $sceneUsage = $hash->{".sceneUsage"};
       my $sceneIDUsage = $hash->{".sceneIDUsage"};
-      my $usage = "unknown argument $cmd, choose one of scene:$sceneUsage sceneID:$sceneIDUsage login updateNodes:noArg updateAll:noArg reboot:noArg closeConnection:noArg openConnection:noArg clearLastError:noArg";
+      my $usage = "unknown argument $cmd, choose one of scene:$sceneUsage sceneID:$sceneIDUsage login updateNodes:noArg updateAll:noArg reboot:noArg clearLastError:noArg";
       return $usage;
   }
 }
@@ -919,13 +917,14 @@ sub KLF200_GW_ERROR_NTF($$) {
 <a name="KLF200"></a>
 <h3>KLF200</h3>
 <ul>
-
+  This module supports the Velux KLF200 box to control io-homecontrol actors. The box is able to control up to 200 nodes.
+  The KLF200 box must have at least firmware version 2.0.0.71 and must be connected to the local network by LAN.
   <a name="KLF200define"></a>
   <b>Define</b><br><br>
   <ul>
     <code>define &lt;name&gt; KLF200 &lt;host&gt;</code><br><br>
 
-    Defines a KLF200 device. <code>&lt;host&gt;</code> is the IP address or hostname of the KLF200 device.<br><br>
+    Defines a KLF200 device. <code>&lt;host&gt;</code> is the IP address or hostname of the KLF200 device connected by LAN.<br><br>
 
     Example:
     <ul>
@@ -941,46 +940,88 @@ sub KLF200_GW_ERROR_NTF($$) {
     As password use the Wifi password, printed at the bottom of the box.
     If this doesn't work, please try the password of the WebUI of the KLF200.
     The password will be stored obfuscated in the FHEM backend and is optional for further login calls.<br>
-    After login the devices will be created by auto create as instances of KLF200Node.<br>
+    After login the devices will be created by auto create as instances of <a href="#KLF200Node">KLF200Node</a>.<br>
 
-    The device name of the nodes will be &lt;name&gt;_&lt;NodeID&gt;, but the names from the KLF200 Web UI will be set as alias.
+    The device name of the nodes will be <code>&lt;name&gt;_&lt;NodeID&gt;</code>, but the names from the KLF200 Web UI will be set as alias.
   </ul>
 
   <a name="KLF200set"></a>
   <b>Set</b><br><br>
   <ul>
-    <code>set &lt;name&gt; login [&lt;password&gt;]</code>
-    <br><br>
-    As password use the Wifi password, printed at the bottom of the box.
-    If this doesn't work, please try the password of the WebUI of the KLF200.
-    The password will be stored obfuscated in the FHEM backend and is optional for further login calls.
-    <br><br>
-    Examples:
-    <ul>
-      <code>set Velux login abc123</code><br>
-      <code>set Velux login</code><br>
-    </ul>
-    <br>
-    <br><br>
-  </ul>
-  <ul>
-    <code>set &lt;name&gt; scene &lt;scene&gt;</code>
-    <br><br>
-    Runs a recorded scene identified by <code>&lt;scene&gt;</code> which is the scene's name defined in the WebUI of KLF200-box.
-    <br><br>
-    Examples:
-    <ul>
-      <code>set Velux scene "all shutters down"</code><br>
-    </ul>
-    <br>
-    Scene names with blanks must be enclosed in double quotes.
-    <br><br>
+    <li>
+      <code>set &lt;name&gt; login [&lt;password&gt;]</code><br>
+      <br>
+      As password use the Wifi password, printed at the bottom of the box.
+      If this doesn't work, please try the password of the WebUI of the KLF200.
+      The password will be stored obfuscated in the FHEM backend and is optional for further login calls.
+      <br><br>
+      Examples:
+      <ul>
+        <code>set Velux login abc123</code><br>
+        <code>set Velux login</code><br>
+      </ul>
+    </li>
+    <li>
+      <code>set &lt;name&gt; scene &lt;scene&gt; [DEFAULT|FAST|SILENT]</code><br>
+      <br>
+      Runs a recorded scene identified by <code>&lt;scene&gt;</code> which is the scene's name defined in the WebUI of KLF200-box.<br>
+      The second optional parameter defines the velocity of the actuators when running a scene.
+      If this parameter is skipped, the attribute velocity is used. Note that older actuators don't support setting velocity.
+      <br><br>
+      Examples:
+      <ul>
+        <code>set Velux scene "all shutters down"</code><br>
+        <code>set Velux scene Night SILENT</code><br>
+      </ul>
+      <br>
+      Scene names with blanks must be enclosed in double quotes.
+    <li>
+    <li>
+      <code>set &lt;name&gt; scene &lt;sceneID&gt; [DEFAULT|FAST|SILENT]</code><br>
+      <br>
+      Runs a recorded scene identified by <code>&lt;sceneID&gt;</code>. To find the scene's ID see Internals SCENES.<br>
+      The second optional parameter defines the velocity of the actuators when running a scene.
+      If this parameter is skipped, the attribute velocity is used. Note that older actuators don't support setting velocity.
+      <br><br>
+      Examples:
+      <ul>
+        <code>set Velux sceneID 3</code><br>
+        <code>set Velux sceneID 1 FAST</code><br>
+      </ul>
+      <br>
+    <li>
+    <li>
+      <code>set &lt;name&gt; updateAll</code><br>
+      <br>
+      Update all data and meta data.
+    <li>
+    <li>
+      <code>set &lt;name&gt; reboot</code><br>
+      <br>
+      Reboot the KLF200 box.
+    <li>
+    <li>
+      <code>set &lt;name&gt; clearLastError</code><br>
+      <br>
+      After you have payed attention to the reading lastError, you can clear it.
+    <li>
   </ul>
   <a name="KLF200attr"></a>
   <b>Attributes</b>
   <ul>
-    <li>controlNames: a comma-separated list of input device name mappings.
-    The format is &lt;6 digit hex address&gt;-&lt;command originator number&gt;:&lt;contol name&gt;</li>
+    <li>controlNames<br>
+        A comma-separated list of input device name mappings.<br>
+        The format is <code>&lt;6 digit hex address&gt;-&lt;command originator number&gt;:&lt;contol name&gt;<code>.<br>
+    </li>
+    <li>velocity<br>
+        Defines the speed of the actuators when running a scene. The parameter at the set function has a higher priority.<br>
+        Values can be DEFAULT, FAST or SILENT.<br>
+    </li>
+    <li>autoReboot<br>
+        Values can be 0 for off and 1 for on, default is on.<br>
+        Reboot the KLF200 box if connection was lost. Reason: The KLF200 box support only two TCP sockets.
+        If the connection was broken a socket is unusable in most cases. So a reboot ensures that always a second connection is available.<br>
+    </li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br><br>

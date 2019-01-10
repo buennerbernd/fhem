@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 29541 2019-10-01 11:00:17 buennerbernd $
+# $Id: 83_KLF200Node.pm 30055 2019-10-01 13:55:15 buennerbernd $
 #
 ##############################################################################
 
@@ -786,13 +786,21 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
 
 =pod
 =item device
-=item summary    represents an io-homecontrol device connected to Velux KLF200
-=item summary_DE represents an io-homecontrol device connected to Velux KLF200
+=item summary    represents an io-homecontrol device connected to a Velux KLF200 box
+=item summary_DE Repr&auml;sentiert ein io-homecontrol Ger&auml;t an einer Velux KLF200 Box
 =begin html
 
 <a name="KLF200Node"></a>
 <h3>KLF200Node</h3>
 <ul>
+  The module KLF200Node represents an io-homecontrol device connected to a Velux KLF200 box.
+  <a name="KLF200Nodedefine"></a>    
+  <b>Define</b><br><br>
+  <ul>
+    Devices of this module will be created by auto create by module <a href="#KLF200">KLF200</a>.<br>
+    The default name of the devices follow the pattern <code>&lt;KLF200 device name&gt;_&lt;NodeID&gt;</code>.
+    Devices can be renamed. If the device has a name in the KLF200 WebUI. This name is set as alias by default.
+  </ul>
 </ul>
 
 =end html
