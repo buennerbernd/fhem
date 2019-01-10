@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 30063 2019-10-01 09:13:17 buennerbernd $
+# $Id: 83_KLF200Node.pm 30065 2019-10-01 09:37:03 buennerbernd $
 #
 ##############################################################################
 
@@ -781,5 +781,6 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
   }     
   return $name;
 }
+
 
 1;

@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 33031 2019-10-01 09:13:17 buennerbernd $
+# $Id: 83_KLF200.pm 33029 2019-10-01 09:36:51 buennerbernd $
 #
 ##############################################################################
 
@@ -984,7 +984,6 @@ sub KLF200_GW_ERROR_NTF($$) {
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br><br>
-
 
 </ul>
 
