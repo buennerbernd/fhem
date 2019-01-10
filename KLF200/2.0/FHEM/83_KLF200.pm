@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 34096 2019-10-01 13:55:15 buennerbernd $
+# $Id: 83_KLF200.pm 34109 2019-10-01 14:15:44 buennerbernd $
 #
 ##############################################################################
 
@@ -918,7 +918,7 @@ sub KLF200_GW_ERROR_NTF($$) {
 <h3>KLF200</h3>
 <ul>
   This module supports the Velux KLF200 box to control io-homecontrol actors. The box is able to control up to 200 nodes.
-  The KLF200 box must have at least firmware version 2.0.0.71 and must be connected to the local network by LAN.
+  The KLF200 box must have at least firmware version 2.0.0.71 and must be connected to the local network by LAN.<br>
   <a name="KLF200define"></a>
   <b>Define</b><br><br>
   <ul>
@@ -942,7 +942,7 @@ sub KLF200_GW_ERROR_NTF($$) {
     The password will be stored obfuscated in the FHEM backend and is optional for further login calls.<br>
     After login the devices will be created by auto create as instances of <a href="#KLF200Node">KLF200Node</a>.<br>
 
-    The device name of the nodes will be <code>&lt;name&gt;_&lt;NodeID&gt;</code>, but the names from the KLF200 Web UI will be set as alias.
+    The device name of the nodes will be <code>&lt;name&gt;_&lt;NodeID&gt;</code>, but the names from the KLF200 Web UI will be set as alias.<br>
   </ul>
 
   <a name="KLF200set"></a>
@@ -975,7 +975,7 @@ sub KLF200_GW_ERROR_NTF($$) {
       </ul>
       <br>
       Scene names with blanks must be enclosed in double quotes.
-    <li>
+    </li>
     <li>
       <code>set &lt;name&gt; scene &lt;sceneID&gt; [DEFAULT|FAST|SILENT]</code><br>
       <br>
@@ -989,17 +989,17 @@ sub KLF200_GW_ERROR_NTF($$) {
         <code>set Velux sceneID 1 FAST</code><br>
       </ul>
       <br>
-    <li>
+    </li>
     <li>
       <code>set &lt;name&gt; updateAll</code><br>
       <br>
       Update all data and meta data.
-    <li>
+    </li>
     <li>
       <code>set &lt;name&gt; reboot</code><br>
       <br>
       Reboot the KLF200 box.
-    <li>
+    </li>
     <li>
       <code>set &lt;name&gt; clearLastError</code><br>
       <br>
@@ -1011,7 +1011,7 @@ sub KLF200_GW_ERROR_NTF($$) {
   <ul>
     <li>controlNames<br>
         A comma-separated list of input device name mappings.<br>
-        The format is <code>&lt;6 digit hex address&gt;-&lt;command originator number&gt;:&lt;contol name&gt;<code>.<br>
+        The format is <code>&lt;6 digit hex address&gt;-&lt;command originator number&gt;:&lt;contol name&gt;</code>.<br>
     </li>
     <li>velocity<br>
         Defines the speed of the actuators when running a scene. The parameter at the set function has a higher priority.<br>

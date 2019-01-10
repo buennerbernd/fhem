@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 30055 2019-10-01 13:55:15 buennerbernd $
+# $Id: 83_KLF200Node.pm 30059 2019-10-01 14:15:44 buennerbernd $
 #
 ##############################################################################
 
@@ -793,7 +793,7 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
 <a name="KLF200Node"></a>
 <h3>KLF200Node</h3>
 <ul>
-  The module KLF200Node represents an io-homecontrol device connected to a Velux KLF200 box.
+  The module KLF200Node represents an io-homecontrol device connected to a Velux KLF200 box.<br>
   <a name="KLF200Nodedefine"></a>    
   <b>Define</b><br><br>
   <ul>
