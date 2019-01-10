@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 30455 2019-09-01 12:55:30 buennerbernd $
+# $Id: 83_KLF200.pm 33031 2019-10-01 09:13:17 buennerbernd $
 #
 ##############################################################################
 
@@ -909,3 +909,84 @@ sub KLF200_GW_ERROR_NTF($$) {
   return;  
 }
 1;
+
+=pod
+=item device
+=item summary control io-homecontrol devices via Velux KLF200
+=item summary_DE steuert io-homecontrol-Ger&auml;te mittels Velux KLF200 
+=begin html
+
+<a name="KLF200"></a>
+<h3>KLF200</h3>
+<ul>
+
+  <a name="KLF200define"></a>
+  <b>Define</b><br><br>
+  <ul>
+    <code>define &lt;name&gt; KLF200 &lt;host&gt;</code><br><br>
+
+    Defines a KLF200 device. <code>&lt;host&gt;</code> is the IP address or hostname of the KLF200 device.<br><br>
+
+    Example:
+    <ul>
+      <code>define Velux KLF200 192.168.0.66</code><br>
+    </ul>
+    
+    <br>
+    Once your device is defined, you have to enter the password:
+    <ul>
+      <code>set &lt;name&gt; login &lt;password&gt;</code><br>
+    </ul>
+    <br>
+    As password use the Wifi password, printed at the bottom of the box.
+    If this doesn't work, please try the password of the WebUI of the KLF200.
+    The password will be stored obfuscated in the FHEM backend and is optional for further login calls.<br>
+    After login the devices will be created by auto create as instances of KLF200Node.<br>
+
+    The device name of the nodes will be &lt;name&gt;_&lt;NodeID&gt;, but the names from the KLF200 Web UI will be set as alias.
+  </ul>
+
+  <a name="KLF200set"></a>
+  <b>Set</b><br><br>
+  <ul>
+    <code>set &lt;name&gt; login [&lt;password&gt;]</code>
+    <br><br>
+    As password use the Wifi password, printed at the bottom of the box.
+    If this doesn't work, please try the password of the WebUI of the KLF200.
+    The password will be stored obfuscated in the FHEM backend and is optional for further login calls.
+    <br><br>
+    Examples:
+    <ul>
+      <code>set Velux login abc123</code><br>
+      <code>set Velux login</code><br>
+    </ul>
+    <br>
+    <br><br>
+  </ul>
+  <ul>
+    <code>set &lt;name&gt; scene &lt;scene&gt;</code>
+    <br><br>
+    Runs a recorded scene identified by <code>&lt;scene&gt;</code> which is the scene's name defined in the WebUI of KLF200-box.
+    <br><br>
+    Examples:
+    <ul>
+      <code>set Velux scene "all shutters down"</code><br>
+    </ul>
+    <br>
+    Scene names with blanks must be enclosed in double quotes.
+    <br><br>
+  </ul>
+  <a name="KLF200attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>controlNames: a comma-separated list of input device name mappings.
+    The format is &lt;6 digit hex address&gt;-&lt;command originator number&gt;:&lt;contol name&gt;</li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br><br>
+
+
+</ul>
+
+=end html
+=cut
