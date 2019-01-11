@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 30059 2019-10-01 14:15:44 buennerbernd $
+# $Id: 83_KLF200Node.pm 32922 2019-11-01 11:49:08 buennerbernd $
 #
 ##############################################################################
 
@@ -793,14 +793,85 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
 <a name="KLF200Node"></a>
 <h3>KLF200Node</h3>
 <ul>
-  The module KLF200Node represents an io-homecontrol device connected to a Velux KLF200 box.<br>
+  The module KLF200Node represents an io-homecontrol device connected to a Velux KLF200 box.<br><br>
+  
   <a name="KLF200Nodedefine"></a>    
   <b>Define</b><br><br>
   <ul>
     Devices of this module will be created by auto create by module <a href="#KLF200">KLF200</a>.<br>
     The default name of the devices follow the pattern <code>&lt;KLF200 device name&gt;_&lt;NodeID&gt;</code>.
     Devices can be renamed. If the device has a name in the KLF200 WebUI. This name is set as alias by default.
+  </ul><br>
+  <a name="KLF200Nodeset"></a>
+  <b>Set</b><br><br>
+  <ul>
+    <li>
+      <code>set &lt;name&gt; &lt;up|down|stop&gt; [DEFAULT|FAST|SILENT]</code><br>
+      <br>
+      Do the same as usual io-homecontrol remote controlswith button up, down and stop.<br>
+      The second optional parameter defines the velocity of the actuator for this command.
+      If this parameter is missing, the attribute <code>velocity</code> is used, see below.<br>
+      <br>
+      Examples:
+      <ul>
+        <code>set Velux up</code><br>
+        <code>set Velux down SILENT</code><br>
+      </ul>
+      <br>
+    </li>
+    <li>
+      <code>set &lt;name&gt;  &lt;on|off&gt; [DEFAULT|FAST|SILENT]</code><br>
+      <br>
+      By default <code>on</code> is mapped to <code>up</code> and <code>off</code> to <code>down</code>.<br>
+      This can be changed by attribute <code>directionOn</code><br>
+      The second optional parameter defines the velocity of the actuator for this command.
+      If this parameter is missing, the attribute <code>velocity</code> is used, see below.<br>
+      <br>
+    </li>
+    <li>
+      <code>set &lt;name&gt; pct &lt;0 - 100&gt; [DEFAULT|FAST|SILENT]</code><br>
+      <br>
+      By default <code>100</code> is mapped to <code>up</code> and <code>0</code> to <code>down</code>.<br>
+      This can be changed by attribute <code>directionOn</code><br>
+      The second optional parameter defines the velocity of the actuator for this command.
+      If this parameter is missing, the attribute <code>velocity</code> is used, see below.<br>
+      <br>
+      Examples:
+      <ul>
+        <code>set Velux pct 100</code><br>
+        <code>set Velux pct 33.333 FAST</code><br>
+      </ul>
+      <br>
+    </li>
+    <li>
+      <code>set &lt;name&gt; toggle [DEFAULT|FAST|SILENT]</code><br>
+      <br>
+      Stop the node if it is Executing.<br>
+      If pct < 50 set pct 100<br>
+      If pct >= 50 set pct 0<br>
+      <br>
+    </li>
+  </ul><br>
+  <a name="KLF200Nodeattr"></a>
+  <b>Attributes</b><br><br>
+  <ul>
+    <li>velocity<br>
+        Defines the speed of the actuators when running a command. The optional parameter at the set function has a higher priority.<br>
+        Values can be DEFAULT, FAST or SILENT. The default value is DEFAULT.<br>
+        Note that older actuators don't support setting velocity.<br>
+        This setting is not used for scenes. See <a href="#KLF200attr">KLF200 attribute velocity</a><br>
+        <br>
+    </li>
+    <li>directionOn<br>
+        Defines the meaning of on and 100%.
+        Values can be <code>up</code> and <code>down</code>. By default the direction of <code>on</code> is mapped to <code>up</code>.<br>
+        The best value might depend on the device type and personal preferences.<br>
+        <br>
+    </li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
+  <br><br>
+  
 </ul>
 
 =end html
