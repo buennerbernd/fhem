@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 34143 2019-11-01 16:08:20 buennerbernd $
+# $Id: 83_KLF200Node.pm 34144 2019-11-01 16:18:43 buennerbernd $
 #
 ##############################################################################
 
@@ -833,7 +833,7 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
         Classification of the last control, e.g. USER, RAIN, SAAC (Stand Alone Automatic Controls).<br>
     </li>
     <li>lastControl<br>
-        Name of the last control device. This can be canged in <a href="#KLF200attr">KLF200 attribute controlNames</a><br>
+        Name of the last control device. This can be changed in <a href="#KLF200attr">KLF200 attribute controlNames</a><br>
     </li>    
   </ul><br>
   <a name="KLF200Nodeset"></a>
