@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 34360 2019-11-01 11:49:08 buennerbernd $
+# $Id: 83_KLF200.pm 34373 2019-11-01 16:08:20 buennerbernd $
 #
 ##############################################################################
 
@@ -1006,7 +1006,7 @@ sub KLF200_GW_ERROR_NTF($$) {
     <li>
       <code>set &lt;name&gt; clearLastError</code><br>
       <br>
-      After you have payed attention to the reading lastError, you can clear it.<br>
+      After you have payed attention to the reading <code>lastError</code>, you can clear it.<br>
     </li>
   </ul><br>
   <a name="KLF200attr"></a>

@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 32922 2019-11-01 11:49:08 buennerbernd $
+# $Id: 83_KLF200Node.pm 34143 2019-11-01 16:08:20 buennerbernd $
 #
 ##############################################################################
 
@@ -802,20 +802,54 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
     The default name of the devices follow the pattern <code>&lt;KLF200 device name&gt;_&lt;NodeID&gt;</code>.
     Devices can be renamed. If the device has a name in the KLF200 WebUI. This name is set as alias by default.
   </ul><br>
+  <a name="KLF200Nodereadings"></a>
+  <b>Readings</b><br><br>
+  <ul>
+    <li>pct<br>
+        The current known position in percent.<br>
+    </li>
+    <li>target<br>
+        The target position in percent.<br>
+    </li>
+    <li>remaining<br>
+        The remaining time in sec. until the node arrives the target. See also reading targetArrival.<br>
+    </li>
+    <li>targetArrival<br>
+        The expected time point when the node arrives the target.<br>
+    </li>
+    <li>operatingState<br>
+        The operating state of the node.<br>
+    </li>
+    <li>sessionRunStatus<br>
+        The status of the current or last command.<br>
+    </li>
+    <li>sessionStatusReply<br>
+        An additional message to the status of the current or last command, e.g. reason for failure.<br>
+    </li>
+    <li>lastMasterExecutionAddress<br>
+        Address of the last control device.
+    </li>
+    <li>lastCommandOriginator<br>
+        Classification of the last control, e.g. USER, RAIN, SAAC (Stand Alone Automatic Controls).<br>
+    </li>
+    <li>lastControl<br>
+        Name of the last control device. This can be canged in <a href="#KLF200attr">KLF200 attribute controlNames</a><br>
+    </li>    
+  </ul><br>
   <a name="KLF200Nodeset"></a>
   <b>Set</b><br><br>
   <ul>
     <li>
       <code>set &lt;name&gt; &lt;up|down|stop&gt; [DEFAULT|FAST|SILENT]</code><br>
       <br>
-      Do the same as usual io-homecontrol remote controlswith button up, down and stop.<br>
+      Do the same as usual io-homecontrol remote controls with button up, down and stop.<br>
       The second optional parameter defines the velocity of the actuator for this command.
       If this parameter is missing, the attribute <code>velocity</code> is used, see below.<br>
       <br>
       Examples:
       <ul>
-        <code>set Velux up</code><br>
-        <code>set Velux down SILENT</code><br>
+        <code>set Velux_1 up</code><br>
+        <code>set Velux_2 down SILENT</code><br>
       </ul>
       <br>
     </li>
@@ -838,8 +872,8 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
       <br>
       Examples:
       <ul>
-        <code>set Velux pct 100</code><br>
-        <code>set Velux pct 33.333 FAST</code><br>
+        <code>set Velux_1 pct 100</code><br>
+        <code>set Velux_2 pct 33.333 FAST</code><br>
       </ul>
       <br>
     </li>
@@ -863,7 +897,7 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
         <br>
     </li>
     <li>directionOn<br>
-        Defines the meaning of on and 100%.
+        Defines the meaning of <code>on</code> and 100%.
         Values can be <code>up</code> and <code>down</code>. By default the direction of <code>on</code> is mapped to <code>up</code>.<br>
         The best value might depend on the device type and personal preferences.<br>
         <br>
