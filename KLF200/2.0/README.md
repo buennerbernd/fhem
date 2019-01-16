@@ -6,7 +6,15 @@ Module 83_KLF200.pm represents the KLF200 box.
 
 Module 83_KLF200Node.pm represents the devices, managed by the KLF200 box.
 
-Copy both ih the folder /opt/fhem/FHEM/ and restart FHEM.
+Load the modules into FHEM:
+
+    update all https://raw.githubusercontent.com/buennerbernd/fhem/master/KLF200/2.0/controls_KLF200.txt
+FHEM must be also up to date:
+
+    update
+Restart FHEM:
+    
+    shutdown restart
 
 Define
 
@@ -24,7 +32,4 @@ After login the devices will be created by auto create as instances of KLF200Nod
 
 The device name of the nodes will be name_NodeID, but the names from the KLF200 Web UI will be set as alias.
   
-Attributes
-
-    directionOn: up/down (default is up) Defines the meaning of on, off, 100%, 0%. 
-                                         This might depend on the device type and personal preferences.
+Further documentation you will find in the commandref of both modules. 
