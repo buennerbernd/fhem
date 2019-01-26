@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 34373 2019-11-01 16:18:43 buennerbernd $
+# $Id: 83_KLF200.pm 34829 2019-26-01 22:24:41 buennerbernd $
 #
 ##############################################################################
 
@@ -732,6 +732,13 @@ sub KLF200_GW_GET_SCENE_LIST_CFM($$) {
   my $name = $hash->{NAME};
   my ($commandHex, $TotalNumberOfObjects) = unpack("H4 C", $bytes);
   Log3($hash, 5, "KLF200 ($name) GW_GET_SCENE_LIST_CFM $commandHex $TotalNumberOfObjects");
+  
+  if (($TotalNumberOfObjects > 0) 
+    and ((not defined($hash->{"SCENES"})) or ($hash->{"SCENES"} eq ""))
+    and (not defined AttrVal($name, "webCmd", undef))) {
+    #Set attribute webCmd the first time we found scenes
+    $attr{$name}{webCmd} = "scene";
+  } 
 
   $hash->{".sceneUsage"} = "";
   $hash->{".sceneIDUsage"} = "";
@@ -918,7 +925,9 @@ sub KLF200_GW_ERROR_NTF($$) {
 <h3>KLF200</h3>
 <ul>
   This module supports the Velux KLF200 box to control io-homecontrol actors. The box is able to control up to 200 nodes.
-  The KLF200 box must have at least firmware version 2.0.0.71 and must be connected to the local network by LAN.<br><br>
+  The KLF200 box must have at least firmware version 2.0.0.71 and must be connected to the local network by LAN.<br>
+  If you start with a new KLF200 box, use the KLF WebUI to configure the box first. 
+  Peer your devices, set names and define some scenes if you like as documented in the KLF200 manual.<br><br>
   
   <a name="KLF200define"></a>
   <b>Define</b><br><br>
