@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 34576 2019-26-01 22:24:41 buennerbernd $
+# $Id: 83_KLF200Node.pm 35271 2019-01-02 16:38:01Z buennerbernd $
 #
 ##############################################################################
 
@@ -267,12 +267,7 @@ sub KLF200Node_Set($$$) {
   my $name = shift @a;
   my $cmd= shift @a;
   
-  if($cmd eq "state") {
-    my $value = shift @a;
-    my $velocity = shift @a;
-    return KLF200Node_SetState($hash, $value, $velocity);
-  }
-  if($cmd eq "pct") {
+  if($cmd =~ /^(state|pct|execution)$/) {
     my $value = shift @a;
     my $velocity = shift @a;
     return KLF200Node_SetState($hash, $value, $velocity);
@@ -299,6 +294,7 @@ sub KLF200Node_Set($$$) {
   my $usage= "Unknown argument $cmd, choose one of";
   $usage .= " on:noArg off:noArg toggle:noArg up:noArg down:noArg stop:noArg" ;
   $usage .= " pct:slider,0,1,100" ;
+  $usage .= " execution:up,down,stop" ;
   $usage .= " statusRequest:Main_info,Target_position,Current_position,Remaining_time" ;
 #  $usage .= " target:noArg" ;
   return $usage;
@@ -369,6 +365,17 @@ sub KLF200Node_PctToRaw($$) {
   return $raw;
 }
 
+sub KLF200Node_BulkUpdateMain($$$$$) {
+  my ($hash, $rawMP, $rawTarget, $remaining, $OperatingState) = @_;
+  my $name = $hash->{NAME};
+  Log3($hash, 5, "KLF200Node ($name) BulkUpdateMain MP:$rawMP T:$rawTarget R:$remaining $OperatingState");
+  my $changed = KLF200Node_BulkUpdateStatePct($hash, $rawMP);
+  KLF200Node_BulkUpdateTarget($hash, $rawTarget);
+  KLF200Node_BulkUpdateExecution($hash, $rawMP, $rawTarget, $OperatingState);
+  my $targetArrival = KLF200Node_BulkUpdateRemaining($hash, $remaining, $OperatingState);
+  return ($changed, $targetArrival); 
+}
+
 sub KLF200Node_BulkUpdateStatePct($$) {
   my ($hash, $raw) = @_; 
   my $name = $hash->{NAME};
@@ -388,19 +395,30 @@ sub KLF200Node_BulkUpdateStatePct($$) {
 sub KLF200Node_BulkUpdateTarget($$) {
   my ($hash, $raw) = @_; 
   my $name = $hash->{NAME};
+  readingsBulkUpdateIfChanged($hash, "MPtarget", $raw, 1);
   if ($raw > 0xC800) { Log3($hash, 5, "KLF200Node ($name) unsupported target raw $raw, keep last known target"); return; }
   my $pct = KLF200Node_RawToPct($hash, $raw);
   readingsBulkUpdateIfChanged($hash, "target", $pct, 1);
 }
 
-sub KLF200Node_BulkUpdateRemaining($$$) {
-  my ($hash, $remaining, $status) = @_; 
+sub KLF200Node_BulkUpdateExecution($$$$) {
+  my ($hash, $rawMP, $rawTarget, $OperatingState) = @_; 
   my $name = $hash->{NAME};
+  my $execution = "stop";
+  if (($OperatingState eq "Executing") or ($OperatingState eq "'Not used'")) {
+    if    (($rawTarget < $rawMP) and ($rawMP <= 51200))     {$execution = "up"}
+    elsif (($rawMP < $rawTarget) and ($rawTarget <= 51200)) {$execution = "down"}
+  }
+  readingsBulkUpdateIfChanged($hash, "execution", $execution, 1);
+}
+
+sub KLF200Node_BulkUpdateRemaining($$$) {
+  my ($hash, $remaining, $OperatingState) = @_; 
   readingsBulkUpdateIfChanged($hash, "remaining", $remaining, 1);
   if ($remaining == 0) {
     return undef;
   }
-  if (($status eq "EXECUTION ACTIVE") or ($status eq "Executing")) {
+  if ($OperatingState eq "Executing") {
     my $targetArrival = gettimeofday() + $remaining;
     my $targetArrivalStr = FmtDateTime($targetArrival);
     if (defined(readingsBulkUpdateIfChanged($hash, "targetArrival", $targetArrivalStr, 1))) {
@@ -492,7 +510,7 @@ sub KLF200Node_GW_COMMAND_REMAINING_TIME_NTF($$) {
   Log3($hash, 5, "KLF200Node ($name) GW_COMMAND_REMAINING_TIME_NTF $commandHex $SessionID $NodeID FP$NodeParameter = $Seconds");
   readingsBeginUpdate($hash);
   if ($NodeParameter == 0) {
-    KLF200Node_BulkUpdateRemaining($hash, $Seconds, ReadingsVal($name, "sessionRunStatus", ""));
+    readingsBulkUpdateIfChanged($hash, "remaining", $Seconds, 1);
   }
   else {
     my $readingName = "FP".$NodeParameter."remaining";
@@ -515,21 +533,26 @@ sub KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($$) {
   if (not defined($hash)) {return $undefined};
 
   my $name = $hash->{NAME};
-  Log3($hash, 5, "KLF200Node ($name) GW_NODE_STATE_POSITION_CHANGED_NTF $commandHex $NodeID $State FP0:$CurrentPosition T:$Target FP1:$FP1CurrentPosition $RemainingTime $TimeStamp");
+  Log3($hash, 5, "KLF200Node ($name) GW_NODE_STATE_POSITION_CHANGED_NTF $commandHex $NodeID $State MP:$CurrentPosition T:$Target FP1:$FP1CurrentPosition $RemainingTime $TimeStamp");
+  RemoveInternalTimer($hash, "KLF200Node_GW_STATUS_REQUEST_REQ");
+  if ( $State == 44 ) { return $name; } #Ignore this event
   my $OperatingState = KLF200Node_GetText($hash, "OperatingState", $State);
   readingsBeginUpdate($hash);
-  my $changed = KLF200Node_BulkUpdateStatePct($hash, $CurrentPosition);
-  KLF200Node_BulkUpdateTarget($hash, $Target);
+  my ($changed, $targetArrival) = KLF200Node_BulkUpdateMain($hash, $CurrentPosition, $Target, $RemainingTime, $OperatingState);
   KLF200Node_BulkUpdateFP($hash, 1, $FP1CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 2, $FP2CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 3, $FP3CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 4, $FP4CurrentPosition);
-  KLF200Node_BulkUpdateRemaining($hash, $RemainingTime, $OperatingState); 
   readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1) if ($OperatingState ne "'Not used'");
   readingsEndUpdate($hash, 1);
   if(defined($changed) and (ReadingsVal($name, "sessionRunStatus", "") ne "EXECUTION ACTIVE")) {
     #Otherwhise it could destroy a running session
-    KLF200Node_GW_STATUS_REQUEST_REQ($hash, "Main_info");
+    if(defined($targetArrival)) {
+      InternalTimer( $targetArrival, "KLF200Node_GW_STATUS_REQUEST_REQ", $hash, "Main_info");
+    }
+    else {     
+      KLF200Node_GW_STATUS_REQUEST_REQ($hash, "Main_info");
+    }
   }
   return $name;
 }
@@ -569,15 +592,13 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   my $name = $hash->{NAME};
   my $klf200Time = FmtDateTime($TimeStamp);
   my $Serial = "$Serial1 $Serial2 $Serial3 $Serial4 $Serial5 $Serial6";
-  Log3($hash, 5, "KLF200Node ($name) GW_GET_ALL_NODES_INFORMATION_NTF $commandHex $NodeID $NodeName $State FP0:$CurrentPosition T:$Target FP1:$FP1CurrentPosition V:$Velocity $RemainingTime $klf200Time");
+  Log3($hash, 5, "KLF200Node ($name) GW_GET_ALL_NODES_INFORMATION_NTF $commandHex $NodeID $NodeName $State MP:$CurrentPosition T:$Target FP1:$FP1CurrentPosition V:$Velocity $RemainingTime $klf200Time");
   readingsBeginUpdate($hash);
-  KLF200Node_BulkUpdateStatePct($hash, $CurrentPosition);
-  KLF200Node_BulkUpdateTarget($hash, $Target);
+  KLF200Node_BulkUpdateMain($hash, $CurrentPosition, $Target, $RemainingTime, $OperatingState);
   KLF200Node_BulkUpdateFP($hash, 1, $FP1CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 2, $FP2CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 3, $FP3CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 4, $FP4CurrentPosition);
-  KLF200Node_BulkUpdateRemaining($hash, $RemainingTime, $OperatingState);
   readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1) if ($OperatingState ne "State unknown");
   readingsBulkUpdateIfChanged($hash, "velocity", $VelocityStr, 1);
   readingsBulkUpdateIfChanged($hash, "nodeVariation", $NodeVariationStr, 1);
@@ -737,7 +758,6 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
   my $SessionStatusOwner = KLF200Node_GetText($hash, "StatusID", $StatusID);
   my $SessionRunStatus = KLF200Node_GetText($hash, "RunStatus", $RunStatus);
   my $SessionStatusReply = KLF200Node_GetText($hash, "StatusReply", $StatusReply);
-  my $targetArrival;
   readingsBeginUpdate($hash);
   readingsBulkUpdateIfChanged($hash, "sessionID", $SessionID, 1);
   readingsBulkUpdateIfChanged($hash, "sessionStatusOwner", $SessionStatusOwner, 1);
@@ -748,11 +768,9 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
     my ($TargetPosition, $CurrentPosition, $RemainingTime, $LastMasterExecutionAddress, $LastCommandOriginator)
       = unpack("n n n H6x C", substr($bytes, 9));
     
+    #Do not set main info, next GW_NODE_STATE_POSITION_CHANGED_NTF has better values
     my $LastCommandOriginatorStr = KLF200Node_GetText($hash, "CommandOriginator", $LastCommandOriginator);
     my $LastControl = KLF200_getControlName($io_hash, $LastMasterExecutionAddress, $LastCommandOriginator);
-    KLF200Node_BulkUpdateTarget($hash, $TargetPosition);   
-    KLF200Node_BulkUpdateStatePct($hash, $CurrentPosition);  
-    $targetArrival = KLF200Node_BulkUpdateRemaining($hash, $RemainingTime, $SessionRunStatus);
     readingsBulkUpdateIfChanged($hash, "lastMasterExecutionAddress", $LastMasterExecutionAddress, 1);
     readingsBulkUpdateIfChanged($hash, "lastCommandOriginator", $LastCommandOriginatorStr, 1);
     readingsBulkUpdateIfChanged($hash, "lastControl", $LastControl, 1);
@@ -766,7 +784,7 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
       if($NodeParameter == 0) {
         if   ($StatusType == 0) { KLF200Node_BulkUpdateTarget($hash, $ParameterValue) }
         elsif($StatusType == 1) { KLF200Node_BulkUpdateStatePct($hash, $ParameterValue) }
-        elsif($StatusType == 2) { $targetArrival = KLF200Node_BulkUpdateRemaining($hash, $ParameterValue, $SessionRunStatus) }
+        elsif($StatusType == 2) { readingsBulkUpdateIfChanged($hash, "remaining", $ParameterValue, 1) }
       }
       else {
         KLF200Node_BulkUpdateFP($hash, $NodeParameter, $ParameterValue);
@@ -774,10 +792,6 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
     }
   }
   readingsEndUpdate($hash, 1);
-  if(defined($targetArrival)) {
-    RemoveInternalTimer($hash, "KLF200Node_GW_STATUS_REQUEST_REQ");
-    InternalTimer( $targetArrival, "KLF200Node_GW_STATUS_REQUEST_REQ", $hash, 3);
-  }     
   return $name;
 }
 
