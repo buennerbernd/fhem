@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 35271 2019-02-02 12:42:25Z buennerbernd $
+# $Id: 83_KLF200Node.pm 35775 2019-02-02 16:38:21Z buennerbernd $
 #
 ##############################################################################
 
@@ -820,9 +820,15 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
   <ul>
     <li>pct<br>
         The current known position in percent.<br>
+        See command <code>set pct</code> below.
     </li>
     <li>target<br>
         The target position in percent.<br>
+    </li>
+    <li>execution<br>
+        The current execution state. Values can be <code>up</code> or <code>down</code> while executing
+        and <code>stop</code> otherwhise.<br>
+        See command <code>set execution</code> below.
     </li>
     <li>remaining<br>
         The remaining time in sec. until the node arrives the target.
@@ -871,7 +877,7 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
       <br>
     </li>
     <li>
-      <code>set &lt;name&gt;  &lt;on|off&gt; [DEFAULT|FAST|SILENT]</code><br>
+      <code>set &lt;name&gt; &lt;on|off&gt; [DEFAULT|FAST|SILENT]</code><br>
       <br>
       By default <code>on</code> is mapped to <code>up</code> and <code>off</code> to <code>down</code>.<br>
       This can be changed by attribute <code>directionOn</code><br>
@@ -895,6 +901,12 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
       <br>
     </li>
     <li>
+      <code>set &lt;name&gt; execution &lt;up|down|stop&gt; [DEFAULT|FAST|SILENT]</code><br>
+      <br>
+      Like <code>set &lt;name&gt; &lt;up|down|stop&gt; [DEFAULT|FAST|SILENT]</code><br>
+      <br>
+    </li>
+    <li>
       <code>set &lt;name&gt; toggle [DEFAULT|FAST|SILENT]</code><br>
       <br>
       Stop the node if it is Executing.<br>
@@ -907,7 +919,7 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
   <b>Attributes</b><br><br>
   <ul>
     <li>velocity<br>
-        Defines the speed of the actuators when running a command. The optional parameter at the set function has a higher priority.<br>
+        Defines the speed of the actuators when running a command. The optional parameter at the set command has a higher priority.<br>
         Values can be DEFAULT, FAST or SILENT. The default value is DEFAULT.<br>
         Note that older actuators don't support setting velocity.<br>
         This setting is not used for scenes. See <a href="#KLF200attr">KLF200 attribute velocity</a><br>
