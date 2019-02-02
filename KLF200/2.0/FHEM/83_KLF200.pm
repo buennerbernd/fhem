@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 34830 2019-01-02 16:38:01Z buennerbernd $
+# $Id: 83_KLF200.pm 34922 2019-02-02 12:42:25Z buennerbernd $
 #
 ##############################################################################
 
@@ -745,6 +745,10 @@ sub KLF200_GW_GET_SCENE_LIST_CFM($$) {
   $hash->{"SCENES"} = "";
   %{$hash->{".sceneToID"}} = ();
   %{$hash->{".idToScene"}} = ();
+  
+  if ($TotalNumberOfObjects == 0) {
+    KLF200_Dequeue($hash, qr/^\x04\x0C/, undef);
+  }
   return;  
 }
 
