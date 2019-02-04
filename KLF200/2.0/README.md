@@ -6,9 +6,8 @@ https://www.velux.com/api/klf200
 
 These modules integrate any io-homecontrol actor into the open source smarthome solution FHEM by KLF-200.
 
-Module 83_KLF200.pm represents the KLF200 box.
-
-Module 83_KLF200Node.pm represents the devices, managed by the KLF200 box.
+- Module 83_KLF200.pm represents the KLF200 box.
+- Module 83_KLF200Node.pm represents the devices, managed by the KLF200 box.
 
 Load the modules into FHEM:
 
