@@ -38,3 +38,5 @@ After login the devices will be created by auto create as instances of KLF200Nod
 The device name of the nodes will be name_NodeID, but the names from the KLF200 Web UI will be set as alias.
   
 Further documentation you will find in the commandref of both modules. 
+
+[FHEM Forum: Velux KLF200 mit Firmware 2.0.0.71 für io-homecontrol](https://forum.fhem.de/index.php/topic,92907.0.html)
