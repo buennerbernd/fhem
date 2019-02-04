@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 35775 2019-02-02 16:38:21Z buennerbernd $
+# $Id: 83_KLF200Node.pm 36950 2019-04-02 20:54:57Z buennerbernd $
 #
 ##############################################################################
 
@@ -179,6 +179,19 @@ sub KLF200Node_InitTexts($) {
     10 => "Secuyou",
     11 => "OVERKIZ",
     12 => "Atlantic Group",
+  };
+  $hash->{".Const"}->{ProductCode}->{1}->{0x0080} = {
+    1 => "SML",
+    5 => "SSL",
+  };
+  $hash->{".Const"}->{ProductCode}->{1}->{0x0101} = {
+    1 => "KMG",
+    2 => "KMG",
+    3 => "CVP",
+    7 => "KSX",
+  };
+  $hash->{".Const"}->{ProductCode}->{1}->{0x0280} = {
+    5 => "FSK",
   };
   $hash->{".Const"}->{StatusID} = {
     0x01 => "USER",
@@ -654,13 +667,20 @@ sub KLF200Node_GW_CS_GET_SYSTEMTABLE_DATA_NTF($$) {
           $NodeTypeSubTypeStr = $hash->{".Const"}->{NodeTypeSubType}->{$NodeType}; 
           if (not defined($NodeTypeSubTypeStr)) { $NodeTypeSubTypeStr = $NodeTypeSubTypeNum };
         };
+        my $productType = ReadingsVal($name, "productType", "");
+        my $productCode = $hash->{".Const"}->{ProductCode}->{$ioManufacturerId}->{$NodeTypeSubType}->{$productType};
         my $model = $ioManufacturer;
+        $model .= " ".$productCode if (defined($productCode));
         $model .= " ".$NodeTypeSubTypeStr if ($NodeTypeSubTypeStr ne $NodeTypeSubTypeNum);
-        $model .= " Type ".$NodeTypeSubTypeNum;
+        if (not defined($productCode)) {
+          $model .= " Type ".$NodeTypeSubTypeNum."-".$productType;
+          $productCode = "Please report your device";
+        }
         readingsBeginUpdate($hash);
         readingsBulkUpdateIfChanged($hash, "ioManufacturer", $ioManufacturer, 1);
         readingsBulkUpdateIfChanged($hash, "nodeTypeSubType", $NodeTypeSubTypeStr, 1);
         readingsBulkUpdateIfChanged($hash, "model", $model, 1);
+        readingsBulkUpdateIfChanged($hash, "productCode", $productCode, 1);
         readingsBulkUpdateIfChanged($hash, "actuatorAddress", $ActuatorAddress, 1);
         readingsBulkUpdateIfChanged($hash, "backboneReferenceNumber", $BackboneReferenceNumber, 1);
         readingsEndUpdate($hash, 1);
@@ -857,6 +877,13 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
     </li>
     <li>lastControl<br>
         Name of the last control device. This can be changed in <a href="#KLF200attr">KLF200 attribute controlNames</a><br>
+    </li>    
+    <li>productCode<br>
+        This is the product code based on user reports.<br>
+        If the value is <code>Please report a your device</code> then please report your device
+        at <a href="https://forum.fhem.de/index.php/topic,92907.0.html">FHEM Forum</a>
+        or <a href="https://github.com/buennerbernd/fhem/issues/4">GitHub</a>.<br>
+        Post the product name and a list, e.g. <code>list Velux_1</code><br>
     </li>    
   </ul><br>
   <a name="KLF200Nodeset"></a>
