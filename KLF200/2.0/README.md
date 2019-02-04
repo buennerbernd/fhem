@@ -1,5 +1,7 @@
 # FHEM modules KLF200 and KLF200Node
 
+![](https://img.shields.io/github/last-commit/buennerbernd/fhem.svg?style=flat)
+
 My own implementation to support the Velux KLF200 box with firmware version 2.0.0.71 in [FHEM](https://www.fhem.de/).
 
 https://www.velux.com/api/klf200
