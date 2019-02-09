@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 36950 2019-04-02 20:54:57Z buennerbernd $
+# $Id: 83_KLF200Node.pm 38808 2019-09-02 20:52:05Z buennerbernd $
 #
 ##############################################################################
 
@@ -117,6 +117,10 @@ sub KLF200Node_InitTexts($) {
     1 => "SILENT",
     2 => "FAST",
     255 => "VELOCITY NOT AVAILABLE",
+  }; 
+  $hash->{".Const"}->{VelocitySupport} = {
+    0 => "Supported",
+    1 => "Not supported",
   }; 
   $hash->{".Const"}->{NodeTypeSubType} = {
     0x0040 => "Interior Venetian Blind",
@@ -304,11 +308,16 @@ sub KLF200Node_Set($$$) {
     my $statusType = shift @a; 
     return KLF200Node_GW_STATUS_REQUEST_REQ($hash, $statusType);
   }
+  if ($cmd eq "getLimitationStatus") {
+    KLF200Node_GW_GET_LIMITATION_STATUS_REQ($hash, 0);
+    return KLF200Node_GW_GET_LIMITATION_STATUS_REQ($hash, 1);
+  }
   my $usage= "Unknown argument $cmd, choose one of";
   $usage .= " on:noArg off:noArg toggle:noArg up:noArg down:noArg stop:noArg" ;
   $usage .= " pct:slider,0,1,100" ;
   $usage .= " execution:up,down,stop" ;
   $usage .= " statusRequest:Main_info,Target_position,Current_position,Remaining_time" ;
+  $usage .= " getLimitationStatus:noArg" ;
 #  $usage .= " target:noArg" ;
   return $usage;
 }
@@ -344,6 +353,7 @@ sub KLF200Node_Parse ($$)
   elsif ($command eq "\x02\x04") { return KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($io_hash, $bytes) }
   elsif ($command eq "\x02\x10") { return KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($io_hash, $bytes) }
   elsif ($command eq "\x03\x07") { return KLF200Node_GW_STATUS_REQUEST_NTF($io_hash, $bytes) }
+  elsif ($command eq "\x03\x14") { return KLF200Node_GW_LIMITATION_STATUS_NTF($io_hash, $bytes) }
   elsif ($command eq "\x01\x02") { return KLF200Node_GW_CS_GET_SYSTEMTABLE_DATA_NTF($io_hash, $bytes) }
   else  { Log3($io_name, 1, "KLF200Node ($io_name) - ignored:  $hexString"); return undef; }
 }
@@ -463,6 +473,13 @@ sub KLF200Node_GetHash($$) {
   return ($hash, undef); 
 }
 
+sub KLF200Node_getNextSessionID($) {
+  my ($hash) = @_;
+  my $SessionID = 0;
+  my $io_hash = $hash->{IODev};
+  $SessionID = KLF200_getNextSessionID($io_hash) if (defined($io_hash));
+  return $SessionID;
+}
 
 sub KLF200Node_GW_COMMAND_RUN_STATUS_NTF($$) {
   my ($io_hash, $bytes) = @_;
@@ -475,10 +492,13 @@ sub KLF200Node_GW_COMMAND_RUN_STATUS_NTF($$) {
 
   my $name = $hash->{NAME};
   Log3($hash, 5, "KLF200Node ($name) GW_COMMAND_RUN_STATUS_NTF $commandHex $SessionID $StatusID $NodeID FP$NodeParameter:$ParameterValue $RunStatus $StatusReply $InformationCode");
-  
+  if ($StatusID != 8) {
+    Log3($hash, 5, "KLF200Node ($name) GW_COMMAND_RUN_STATUS_NTF skipped, not triggered by FHEM");
+    return $name;
+  }
   my $SessionStatusOwner = KLF200Node_GetText($hash, "StatusID", $StatusID);
-  my $SessionRunStatus = KLF200Node_GetText($hash, "RunStatus", $RunStatus);
-  my $SessionStatusReply = KLF200Node_GetText($hash, "StatusReply", $StatusReply);
+  my $LastRunStatus = KLF200Node_GetText($hash, "RunStatus", $RunStatus);
+  my $LastStatusReply = KLF200Node_GetText($hash, "StatusReply", $StatusReply);
   my $LastCommandOriginator = 8;
   my $LastCommandOriginatorStr = KLF200Node_GetText($hash, "CommandOriginator", $LastCommandOriginator);
   my $LastMasterExecutionAddress = ReadingsVal($io_hash->{NAME}, "address", "UNKNOWN");
@@ -495,9 +515,9 @@ sub KLF200Node_GW_COMMAND_RUN_STATUS_NTF($$) {
   }
   readingsBulkUpdateIfChanged($hash, "sessionID", $SessionID, 1);
   readingsBulkUpdateIfChanged($hash, "sessionStatusOwner", $SessionStatusOwner, 1);
-  readingsBulkUpdateIfChanged($hash, "sessionRunStatus", $SessionRunStatus, 1);
-  readingsBulkUpdateIfChanged($hash, "sessionStatusReply", $SessionStatusReply, 1);
   readingsBulkUpdateIfChanged($hash, "sessionInformationCode", $InformationCode, 1);
+  readingsBulkUpdateIfChanged($hash, "lastRunStatus", $LastRunStatus, 1);
+  readingsBulkUpdateIfChanged($hash, "lastStatusReply", $LastStatusReply, 1);
   readingsBulkUpdateIfChanged($hash, "lastMasterExecutionAddress", $LastMasterExecutionAddress, 1);
   readingsBulkUpdateIfChanged($hash, "lastControl", $LastControl, 1);
   readingsBulkUpdateIfChanged($hash, "lastCommandOriginator", $LastCommandOriginatorStr, 1);
@@ -558,7 +578,7 @@ sub KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($$) {
   KLF200Node_BulkUpdateFP($hash, 4, $FP4CurrentPosition);
   readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1) if ($OperatingState ne "'Not used'");
   readingsEndUpdate($hash, 1);
-  if(defined($changed) and (ReadingsVal($name, "sessionRunStatus", "") ne "EXECUTION ACTIVE")) {
+  if(defined($changed) and (ReadingsVal($name, "lastRunStatus", "") ne "EXECUTION ACTIVE")) {
     #Otherwhise it could destroy a running session
     if(defined($targetArrival)) {
       InternalTimer( $targetArrival, "KLF200Node_GW_STATUS_REQUEST_REQ", $hash, "Main_info");
@@ -599,7 +619,7 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   $NodeName =~ s/\x00+$//;
   $NodeName = decode("UTF-8", $NodeName);  
   my $OperatingState = KLF200Node_GetText($hash, "OperatingState", $State);
-  my $VelocityStr = KLF200Node_GetText($hash, "Velocity", $Velocity);
+  my $VelocityStr = KLF200Node_GetText($hash, "VelocitySupport", $Velocity);
   my $NodeVariationStr = KLF200Node_GetText($hash, "NodeVariation", $NodeVariation);
   my $PowerModeStr = KLF200Node_GetText($hash, "PowerMode", $PowerMode);
   my $name = $hash->{NAME};
@@ -705,9 +725,7 @@ sub KLF200Node_GW_COMMAND_SEND_REQ($$$) {
   my $name = $hash->{NAME};    
   my $NodeId = $hash->{NodeID};
   my $Command = "\x03\x00";
-  my $SessionID = 0;
-  my $io_hash = $hash->{IODev};
-  if (defined($io_hash)) {$SessionID = KLF200_getNextSessionID($io_hash)};
+  my $SessionID = KLF200Node_getNextSessionID($hash);
   Log3($hash, 5, "KLF200Node ($name) KLF200Node_GW_COMMAND_SEND_REQ SessionID $SessionID raw $raw");
   my $SessionIDShort = pack("n", $SessionID);
   my $CommandOriginator = "\x08"; #SAAC Stand Alone Automatic Controls 
@@ -747,9 +765,7 @@ sub KLF200Node_GW_STATUS_REQUEST_REQ($$) {
   my $NodeId = $hash->{NodeID};
   my $Command = "\x03\x05";
   my $StatusTypeId = KLF200Node_GetId($hash, "StatusType", $statusType, 3);
-  my $SessionID = 0;
-  my $io_hash = $hash->{IODev};
-  if (defined($io_hash)) {$SessionID = KLF200_getNextSessionID($io_hash)};
+  my $SessionID = KLF200Node_getNextSessionID($hash);
   Log3($hash, 5, "KLF200Node ($name) KLF200Node_GW_STATUS_REQUEST_REQ SessionID $SessionID StatusType $StatusTypeId");
   my $SessionIDShort = pack("n", $SessionID);
   my $IndexArrayCount = pack("C", 1);
@@ -776,13 +792,13 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
   Log3($hash, 5, "KLF200Node ($name) GW_STATUS_REQUEST_NTF $commandHex $SessionID $StatusID $NodeID $RunStatus $StatusReply $StatusType");
 
   my $SessionStatusOwner = KLF200Node_GetText($hash, "StatusID", $StatusID);
-  my $SessionRunStatus = KLF200Node_GetText($hash, "RunStatus", $RunStatus);
-  my $SessionStatusReply = KLF200Node_GetText($hash, "StatusReply", $StatusReply);
+  my $LastRunStatus = KLF200Node_GetText($hash, "RunStatus", $RunStatus);
+  my $LastStatusReply = KLF200Node_GetText($hash, "StatusReply", $StatusReply);
   readingsBeginUpdate($hash);
   readingsBulkUpdateIfChanged($hash, "sessionID", $SessionID, 1);
   readingsBulkUpdateIfChanged($hash, "sessionStatusOwner", $SessionStatusOwner, 1);
-  readingsBulkUpdateIfChanged($hash, "sessionRunStatus", $SessionRunStatus, 1);
-  readingsBulkUpdateIfChanged($hash, "sessionStatusReply", $SessionStatusReply, 1);
+  readingsBulkUpdateIfChanged($hash, "lastRunStatus", $LastRunStatus, 1);
+  readingsBulkUpdateIfChanged($hash, "lastStatusReply", $LastStatusReply, 1);
   
   if($StatusType == 3) {
     my ($TargetPosition, $CurrentPosition, $RemainingTime, $LastMasterExecutionAddress, $LastCommandOriginator)
@@ -812,6 +828,37 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
     }
   }
   readingsEndUpdate($hash, 1);
+  return $name;
+}
+
+sub KLF200Node_GW_GET_LIMITATION_STATUS_REQ($$) {
+  my ($hash, $limitationType) = @_;
+  my $name = $hash->{NAME};    
+  my $NodeId = $hash->{NodeID};
+  my $Command = "\x03\x12";
+  my $SessionID = KLF200Node_getNextSessionID($hash);
+  Log3($hash, 1, "KLF200Node ($name) KLF200Node_GW_GET_LIMITATION_STATUS_REQ SessionID $SessionID LimitationType $limitationType");
+  my $SessionIDShort = pack("n", $SessionID);
+  my $IndexArrayCount = pack("C", 1);
+  my $IndexArray = pack("Cx19", $NodeId);
+  my $NodeParameter = "\x00";
+  my $LimitationTypeByte = pack("C", $limitationType);
+  
+  my $bytes = $Command.$SessionIDShort.$IndexArrayCount.$IndexArray.$NodeParameter.$LimitationTypeByte;
+  return IOWrite($hash, $bytes);
+}
+
+sub KLF200Node_GW_LIMITATION_STATUS_NTF($$) {
+  my ($io_hash, $bytes) = @_;
+
+  my ($commandHex, $SessionID, $NodeID, $ParameterID, $MinValue, $MaxValue, $LimitationOriginator, $LimitationTime) 
+    = unpack("H4 n C C n n C C", $bytes);
+    
+  my ($hash, $undefined) = KLF200Node_GetHash($io_hash, $NodeID);
+  if (not defined($hash)) {return $undefined};
+
+  my $name = $hash->{NAME};
+  Log3($hash, 1, "KLF200Node ($name) GW_LIMITATION_STATUS_NTF $commandHex $SessionID $NodeID FP$ParameterID min:$MinValue max:$MaxValue $LimitationOriginator $LimitationTime");
   return $name;
 }
 
@@ -863,10 +910,10 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
     <li>operatingState<br>
         The operating state of the node.<br>
     </li>
-    <li>sessionRunStatus<br>
+    <li>lastRunStatus<br>
         The status of the current or last command.<br>
     </li>
-    <li>sessionStatusReply<br>
+    <li>lastStatusReply<br>
         An additional message to the status of the current or last command, e.g. reason for failure.<br>
     </li>
     <li>lastMasterExecutionAddress<br>
@@ -879,8 +926,8 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
         Name of the last control device. This can be changed in <a href="#KLF200attr">KLF200 attribute controlNames</a><br>
     </li>    
     <li>productCode<br>
-        This is the product code based on user reports.<br>
-        If the value is <code>Please report a your device</code> then please report your device
+        This is the product code based on user feedback.<br>
+        If the value is <code>Please report a your device</code> then please report this product
         at <a href="https://forum.fhem.de/index.php/topic,92907.0.html">FHEM Forum</a>
         or <a href="https://github.com/buennerbernd/fhem/issues/4">GitHub</a>.<br>
         Post the product name and a list, e.g. <code>list Velux_1</code><br>

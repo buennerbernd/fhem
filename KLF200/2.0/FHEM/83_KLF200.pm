@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 34922 2019-04-02 20:54:57Z buennerbernd $
+# $Id: 83_KLF200.pm 35035 2019-09-02 20:52:05Z buennerbernd $
 #
 ##############################################################################
 
@@ -72,7 +72,7 @@ sub KLF200_InitTexts($) {
   $hash->{".Const"}->{ErrorNumber} = {
     0 => "Not further defined error.",
     1 => "Unknown Command or command is not accepted at this state.",
-    3 => "ERROR on Frame Structure.",
+    2 => "ERROR on Frame Structure.",
     7 => "Busy. Try again later.",
     8 => "Bad system table index.",
     12 => "Not authenticated.",
@@ -203,6 +203,7 @@ sub KLF200_Read($) {
   elsif ($command eq "\x03\x02") { KLF200_DispatchToNode($hash, $bytes) }
   elsif ($command eq "\x03\x03") { KLF200_DispatchToNode($hash, $bytes) }
   elsif ($command eq "\x03\x07") { KLF200_DispatchToNode($hash, $bytes) }
+  elsif ($command eq "\x03\x14") { KLF200_DispatchToNode($hash, $bytes) }
   elsif ($command eq "\x02\x11") { KLF200_DispatchToNode($hash, $bytes) }
   elsif ($command eq "\x02\x04") { KLF200_DispatchToNode($hash, $bytes) }
   elsif ($command eq "\x02\x10") { KLF200_DispatchToNode($hash, $bytes) }
@@ -859,7 +860,7 @@ sub KLF200_GW_SESSION_FINISHED_NTF($$) {
   my ($commandHex, $SessionID) = unpack("H4 n", $bytes);
   Log3($hash, 5, "KLF200 ($name) GW_SESSION_FINISHED_NTF $commandHex $SessionID");
   
-  KLF200_Dequeue($hash, qr/^(\x04\x12|\x03\x05)/, $SessionID); #GW_ACTIVATE_SCENE_REQ, GW_STATUS_REQUEST_REQ
+  KLF200_Dequeue($hash, qr/^(\x04\x12|\x03\x05|\x03\x12)/, $SessionID); #GW_ACTIVATE_SCENE_REQ, GW_STATUS_REQUEST_REQ, GW_GET_LIMITATION_STATUS_REQ
   return;  
 }
 
