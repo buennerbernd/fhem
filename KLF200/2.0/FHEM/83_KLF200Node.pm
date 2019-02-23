@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 38808 2019-09-02 20:52:05Z buennerbernd $
+# $Id: 83_KLF200Node.pm 48171 2019-23-02 21:23:34Z buennerbernd $
 #
 ##############################################################################
 
@@ -22,7 +22,7 @@ sub KLF200Node_Initialize($) {
   $hash->{ReadFn}     = 'KLF200Node_Read';
   $hash->{ParseFn}    = 'KLF200Node_Parse';
   
-  $hash->{AttrList}   = "directionOn:up,down velocity:DEFAULT,SILENT,FAST " . $readingFnAttributes;
+  $hash->{AttrList}   = "directionOn:up,down velocity:DEFAULT,SILENT,FAST" . $readingFnAttributes;
   $hash->{parseParams}  = 1;
   $hash->{Match}      = ".*";
 
@@ -308,24 +308,85 @@ sub KLF200Node_Set($$$) {
     my $statusType = shift @a; 
     return KLF200Node_GW_STATUS_REQUEST_REQ($hash, $statusType);
   }
-  if ($cmd eq "getLimitationStatus") {
-    KLF200Node_GW_GET_LIMITATION_STATUS_REQ($hash, 0);
-    return KLF200Node_GW_GET_LIMITATION_STATUS_REQ($hash, 1);
+  if ($cmd eq "updateStatus") {
+    return KLF200Node_UpdateStatus($hash);
   }
+  if ($cmd eq "updateLimitation") {
+    return KLF200Node_UpdateLimitation($hash);
+  }
+  if ($cmd eq "limitationClear") {
+    return KLF200Node_SetLimitation($hash, undef, undef);
+  }
+  if ($cmd eq "limitationMin") {
+    my $minPct = shift @a;
+    my $test = shift @a;
+    if (defined($test) and ($test eq "test")) {
+      readingsSingleUpdate($hash, "limitationMin", $minPct, 1);
+      return undef;
+    } 
+    return KLF200Node_SetLimitation($hash, $minPct, undef);
+  }
+  if ($cmd eq "limitationMax") {
+    my $maxPct = shift @a; 
+    my $test = shift @a; 
+    if (defined($test) and ($test eq "test")) {
+      readingsSingleUpdate($hash, "limitationMax", $maxPct, 1);
+      return undef;
+    } 
+    return KLF200Node_SetLimitation($hash, undef, $maxPct);
+  }
+  if ($cmd eq "limitationUpdateInterval") {
+    my $interval = shift @a; 
+    return KLF200Node_SetLimitationUpdateInterval($hash, $interval);
+  }
+  
   my $usage= "Unknown argument $cmd, choose one of";
   $usage .= " on:noArg off:noArg toggle:noArg up:noArg down:noArg stop:noArg" ;
   $usage .= " pct:slider,0,1,100" ;
   $usage .= " execution:up,down,stop" ;
-  $usage .= " statusRequest:Main_info,Target_position,Current_position,Remaining_time" ;
-  $usage .= " getLimitationStatus:noArg" ;
+#  $usage .= " statusRequest:Main_info,Target_position,Current_position,Remaining_time" ;
+  $usage .= " updateStatus:noArg" ;
+  $usage .= " updateLimitation:noArg" ;
+  $usage .= " limitationClear:noArg" ;
+  $usage .= " limitationMin:slider,0,1,100" ;
+  $usage .= " limitationMax:slider,0,1,100" ;  
+  $usage .= " limitationUpdateInterval" ;  
 #  $usage .= " target:noArg" ;
   return $usage;
+}
+
+sub KLF200Node_UpdateLimitation($) {
+  my ($hash,) = @_;
+  my $name = $hash->{NAME};
+  
+  RemoveInternalTimer($hash, "KLF200Node_UpdateLimitation");
+  my $limitationUpdateInterval = ReadingsVal($name, "limitationUpdateInterval", "off");
+  if ($limitationUpdateInterval eq "off") { return undef };
+  if (ReadingsVal($name, "execution", "stop") ne "stop") {
+    #defer if executing
+    Log3($name, 5, "KLF200Node ($name) - UpdateLimitation defer");
+    $hash->{".UpdateLimitation"} = "YES";
+    return undef;
+  }
+  delete($hash->{".UpdateLimitation"});
+  my $result = KLF200Node_GW_GET_LIMITATION_STATUS_REQ($hash, 0);
+  KLF200Node_GW_GET_LIMITATION_STATUS_REQ($hash, 1);
+  
+  InternalTimer( gettimeofday() + $limitationUpdateInterval, "KLF200Node_UpdateLimitation", $hash) if ($limitationUpdateInterval =~ /^\d+$/);
+  return $result;
+}
+
+sub KLF200Node_UpdateStatus($) {
+  my ($hash,) = @_;
+  my $name = $hash->{NAME};
+  
+  return KLF200Node_GW_STATUS_REQUEST_REQ($hash, "Main_info");
 }
 
 sub KLF200Node_SetState($$$) {
   my ($hash, $state, $velocity) = @_;
   my $name = $hash->{NAME};
-  Log3($name, 5, "KLF200Node ($name) - Set $state");
+  Log3($name, 5, "KLF200Node ($name) - set $state");
   my $raw;
   if    ($state eq "stop") { $raw = 0xD200 }
   elsif ($state eq "up")   { $raw = 0x0000 }
@@ -338,6 +399,64 @@ sub KLF200Node_SetState($$$) {
   return KLF200Node_GW_COMMAND_SEND_REQ($hash, $raw, $velocity); 
 }
 
+sub KLF200Node_SetLimitation($$$) {
+  my ($hash, $minPct, $maxPct) = @_;
+  my $name = $hash->{NAME};
+  
+  if (not defined($minPct) and not defined($maxPct)) {    
+    Log3($name, 5, "KLF200Node ($name) - set limitationClear");
+    readingsSingleUpdate($hash, ".limitationMin", 0, 1);
+    return KLF200Node_GW_SET_LIMITATION_REQ($hash, 0xD400, 0xD400, 255);
+  }
+  my $pctCurrent = ReadingsVal($name, "pct", 0);
+  my $pctNew = undef;
+  my $minRaw = ReadingsVal($name, ".limitationMin", 0); #ignore doesn't work for min, use last .limitationMin set
+  my $maxRaw = 0xD400; #ignore
+  my $directionOn = AttrVal($name, "directionOn", "up");
+  if (defined($minPct)) {
+    Log3($name, 5, "KLF200Node ($name) - set limitationMin $minPct");
+    if($minPct > ReadingsVal($name, "limitationMax", 100)) {
+      Log3($name, 1, "KLF200Node ($name) - limitationMin > limitationMax");
+      return "limitationMin > limitationMax";
+    }
+    if($pctCurrent < $minPct) { $pctNew = $minPct };
+    if ($directionOn eq "up") {
+      $maxRaw = KLF200Node_PctToRaw($hash, $minPct);
+    }
+    else {
+      $minRaw = KLF200Node_PctToRaw($hash, $minPct);
+      readingsSingleUpdate($hash, ".limitationMin", $minRaw, 1);
+    }
+  }
+  if (defined($maxPct)) {
+    Log3($name, 5, "KLF200Node ($name) - set limitationMax $maxPct");
+    if($maxPct < ReadingsVal($name, "limitationMin", 0)) {
+      Log3($name, 1, "KLF200Node ($name) - limitationMax < limitationMin");
+      return "limitationMax < limitationMin";
+    }
+    if($pctCurrent > $maxPct) { $pctNew = $maxPct };
+    if ($directionOn eq "up") {
+      $minRaw = KLF200Node_PctToRaw($hash, $maxPct);
+      readingsSingleUpdate($hash, ".limitationMin", $minRaw, 1);
+    }
+    else {
+      $maxRaw = KLF200Node_PctToRaw($hash, $maxPct);
+    }
+  }
+  my $result =  KLF200Node_GW_SET_LIMITATION_REQ($hash, $minRaw, $maxRaw, 253);
+  if (defined($pctNew)) { KLF200Node_SetState($hash, $pctNew, undef) };
+  return $result;
+}
+
+sub KLF200Node_SetLimitationUpdateInterval($$) {
+  my ($hash, $interval) = @_;
+  my $name = $hash->{NAME};
+  
+  Log3($name, 5, "KLF200Node ($name) - set limitationUpdateInterval $interval");
+  if (not defined($interval) or (not $interval =~ /^(off|onChange|\d+)$/)) {$interval = "off"};
+  readingsSingleUpdate($hash, "limitationUpdateInterval", $interval, 1);
+  KLF200Node_UpdateLimitation($hash);
+}
 
 sub KLF200Node_Parse ($$)
 {
@@ -389,13 +508,17 @@ sub KLF200Node_PctToRaw($$) {
 }
 
 sub KLF200Node_BulkUpdateMain($$$$$) {
-  my ($hash, $rawMP, $rawTarget, $remaining, $OperatingState) = @_;
+  my ($hash, $rawMP, $rawTarget, $remaining, $state) = @_;
   my $name = $hash->{NAME};
+  my $OperatingState = KLF200Node_GetText($hash, "OperatingState", $state);
   Log3($hash, 5, "KLF200Node ($name) BulkUpdateMain MP:$rawMP T:$rawTarget R:$remaining $OperatingState");
   my $changed = KLF200Node_BulkUpdateStatePct($hash, $rawMP);
   KLF200Node_BulkUpdateTarget($hash, $rawTarget);
   KLF200Node_BulkUpdateExecution($hash, $rawMP, $rawTarget, $OperatingState);
   my $targetArrival = KLF200Node_BulkUpdateRemaining($hash, $remaining, $OperatingState);
+  if (($OperatingState ne "State unknown") and ($OperatingState ne "'Not used'")) {
+    readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1);
+  }
   return ($changed, $targetArrival); 
 }
 
@@ -508,7 +631,10 @@ sub KLF200Node_GW_COMMAND_RUN_STATUS_NTF($$) {
   
   readingsBeginUpdate($hash);
   if ($NodeParameter == 0) { #MP: Main Parameter
-    KLF200Node_BulkUpdateStatePct($hash, $ParameterValue);
+    # This Parameter is sometimes buggy, next GW_NODE_STATE_POSITION_CHANGED_NTF has better values
+    # Info to KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF: GW_STATUS_REQUEST_REQ isn't necessary
+    # exept the operatingState is Done, then no direct GW_NODE_STATE_POSITION_CHANGED_NTF will follow
+    $hash->{".UpdateStatus"} = "NO" if ( ReadingsVal($name, "operatingState", "Done") ne "Done");
   }
   else {
     KLF200Node_BulkUpdateFP($hash, $NodeParameter, $ParameterValue);
@@ -525,7 +651,10 @@ sub KLF200Node_GW_COMMAND_RUN_STATUS_NTF($$) {
   
   if (($LastMasterExecutionAddress eq "UNKNOWN") and ($RunStatus != 2)) {
     #determine the address of KLF200
-    KLF200Node_GW_STATUS_REQUEST_REQ($hash, "Main_info");
+    KLF200Node_UpdateStatus($hash);
+  }
+  if (($StatusReply >= 0xE0) and ($StatusReply <= 0xEE)) {
+    KLF200Node_UpdateLimitation($hash);
   }
   return $name;
 }
@@ -567,24 +696,33 @@ sub KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($$) {
 
   my $name = $hash->{NAME};
   Log3($hash, 5, "KLF200Node ($name) GW_NODE_STATE_POSITION_CHANGED_NTF $commandHex $NodeID $State MP:$CurrentPosition T:$Target FP1:$FP1CurrentPosition $RemainingTime $TimeStamp");
-  RemoveInternalTimer($hash, "KLF200Node_GW_STATUS_REQUEST_REQ");
+  RemoveInternalTimer($hash, "KLF200Node_UpdateStatus");
   if ( $State == 44 ) { return $name; } #Ignore this event
-  my $OperatingState = KLF200Node_GetText($hash, "OperatingState", $State);
   readingsBeginUpdate($hash);
-  my ($changed, $targetArrival) = KLF200Node_BulkUpdateMain($hash, $CurrentPosition, $Target, $RemainingTime, $OperatingState);
+  my ($changed, $targetArrival) = KLF200Node_BulkUpdateMain($hash, $CurrentPosition, $Target, $RemainingTime, $State);
   KLF200Node_BulkUpdateFP($hash, 1, $FP1CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 2, $FP2CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 3, $FP3CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 4, $FP4CurrentPosition);
-  readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1) if ($OperatingState ne "'Not used'");
   readingsEndUpdate($hash, 1);
-  if(defined($changed) and (ReadingsVal($name, "lastRunStatus", "") ne "EXECUTION ACTIVE")) {
+  if ((ReadingsVal($name, "lastRunStatus", "") ne "EXECUTION ACTIVE")) {
     #Otherwhise it could destroy a running session
-    if(defined($targetArrival)) {
-      InternalTimer( $targetArrival, "KLF200Node_GW_STATUS_REQUEST_REQ", $hash, "Main_info");
+    my $updateLimitation = delete($hash->{".UpdateLimitation"});
+    if(defined($changed)) {
+      $updateLimitation = "YES";
+      my $updateStatus = delete($hash->{".UpdateStatus"});
+      $updateStatus = "YES" if (not defined($updateStatus));
+      if ($updateStatus eq "YES") {
+        if(defined($targetArrival)) {
+          InternalTimer( $targetArrival, "KLF200Node_UpdateStatus", $hash);
+        }
+        else {     
+          KLF200Node_UpdateStatus($hash);
+        }
+      }
     }
-    else {     
-      KLF200Node_GW_STATUS_REQUEST_REQ($hash, "Main_info");
+    if (defined($updateLimitation)) {
+      KLF200Node_UpdateLimitation($hash);  
     }
   }
   return $name;
@@ -618,7 +756,6 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   
   $NodeName =~ s/\x00+$//;
   $NodeName = decode("UTF-8", $NodeName);  
-  my $OperatingState = KLF200Node_GetText($hash, "OperatingState", $State);
   my $VelocityStr = KLF200Node_GetText($hash, "VelocitySupport", $Velocity);
   my $NodeVariationStr = KLF200Node_GetText($hash, "NodeVariation", $NodeVariation);
   my $PowerModeStr = KLF200Node_GetText($hash, "PowerMode", $PowerMode);
@@ -627,12 +764,11 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   my $Serial = "$Serial1 $Serial2 $Serial3 $Serial4 $Serial5 $Serial6";
   Log3($hash, 5, "KLF200Node ($name) GW_GET_ALL_NODES_INFORMATION_NTF $commandHex $NodeID $NodeName $State MP:$CurrentPosition T:$Target FP1:$FP1CurrentPosition V:$Velocity $RemainingTime $klf200Time");
   readingsBeginUpdate($hash);
-  KLF200Node_BulkUpdateMain($hash, $CurrentPosition, $Target, $RemainingTime, $OperatingState);
+  KLF200Node_BulkUpdateMain($hash, $CurrentPosition, $Target, $RemainingTime, $State);
   KLF200Node_BulkUpdateFP($hash, 1, $FP1CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 2, $FP2CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 3, $FP3CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 4, $FP4CurrentPosition);
-  readingsBulkUpdateIfChanged($hash, "operatingState", $OperatingState, 1) if ($OperatingState ne "State unknown");
   readingsBulkUpdateIfChanged($hash, "velocity", $VelocityStr, 1);
   readingsBulkUpdateIfChanged($hash, "nodeVariation", $NodeVariationStr, 1);
   if (defined(readingsBulkUpdateIfChanged($hash, "name", $NodeName, 1))) {
@@ -655,6 +791,7 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   if ($commandHex eq "0210") {
     KLF200_Dequeue($io_hash, qr/^\x02\x00/, undef);
   }
+  KLF200Node_UpdateLimitation($hash);
   return $name;
 }
 
@@ -798,7 +935,7 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
   readingsBulkUpdateIfChanged($hash, "sessionID", $SessionID, 1);
   readingsBulkUpdateIfChanged($hash, "sessionStatusOwner", $SessionStatusOwner, 1);
   readingsBulkUpdateIfChanged($hash, "lastRunStatus", $LastRunStatus, 1);
-  readingsBulkUpdateIfChanged($hash, "lastStatusReply", $LastStatusReply, 1);
+  my $statusReplyChanged = readingsBulkUpdateIfChanged($hash, "lastStatusReply", $LastStatusReply, 1);
   
   if($StatusType == 3) {
     my ($TargetPosition, $CurrentPosition, $RemainingTime, $LastMasterExecutionAddress, $LastCommandOriginator)
@@ -810,6 +947,8 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
     readingsBulkUpdateIfChanged($hash, "lastMasterExecutionAddress", $LastMasterExecutionAddress, 1);
     readingsBulkUpdateIfChanged($hash, "lastCommandOriginator", $LastCommandOriginatorStr, 1);
     readingsBulkUpdateIfChanged($hash, "lastControl", $LastControl, 1);
+    # Info to KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF: GW_STATUS_REQUEST_REQ isn't necessary 
+    $hash->{".UpdateStatus"} = "NO";
   }
   else {
     my $StatusCount = unpack("C", substr($bytes, 9, 1));
@@ -828,6 +967,9 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
     }
   }
   readingsEndUpdate($hash, 1);
+  if (defined($statusReplyChanged) and ($StatusReply >= 0xE0) and ($StatusReply <= 0xEE)) {
+    $hash->{".UpdateLimitation"} = "YES";
+  }
   return $name;
 }
 
@@ -858,8 +1000,52 @@ sub KLF200Node_GW_LIMITATION_STATUS_NTF($$) {
   if (not defined($hash)) {return $undefined};
 
   my $name = $hash->{NAME};
-  Log3($hash, 1, "KLF200Node ($name) GW_LIMITATION_STATUS_NTF $commandHex $SessionID $NodeID FP$ParameterID min:$MinValue max:$MaxValue $LimitationOriginator $LimitationTime");
+  Log3($hash, 5, "KLF200Node ($name) GW_LIMITATION_STATUS_NTF $commandHex $SessionID $NodeID FP$ParameterID min:$MinValue max:$MaxValue $LimitationOriginator $LimitationTime");
+  my $directionOn = AttrVal($name, "directionOn", "up");
+  my $limitationMin;
+  my $limitationMax;
+  readingsBeginUpdate($hash);
+  if ($MinValue<=0xC800) {
+    my $pct = KLF200Node_RawToPct($hash, $MinValue);
+    if ($directionOn eq "up") { $limitationMax = readingsBulkUpdateIfChanged($hash, "limitationMax", $pct, 1) }
+    else                      { $limitationMin = readingsBulkUpdateIfChanged($hash, "limitationMin", $pct, 1) }    
+  }
+  if ($MaxValue<=0xC800) {
+    my $pct = KLF200Node_RawToPct($hash, $MaxValue);
+    if ($directionOn eq "up") { $limitationMin = readingsBulkUpdateIfChanged($hash, "limitationMin", $pct, 1) }
+    else                      { $limitationMax = readingsBulkUpdateIfChanged($hash, "limitationMax", $pct, 1) }    
+  }
+  readingsEndUpdate($hash, 1);
+  
+  if ($LimitationOriginator != 8) {
+    my $pct = ReadingsVal($name, "pct", 50);
+    if ((defined($limitationMin) and ($pct < $limitationMin))
+      or (defined($limitationMax) and ($pct > $limitationMax))) {
+      KLF200Node_UpdateStatus($hash);  
+    }
+  }
   return $name;
+}
+
+sub KLF200Node_GW_SET_LIMITATION_REQ($$$$) {
+  my ($hash, $valueMin, $valueMax, $limitationTime) = @_;
+  my $name = $hash->{NAME};    
+  my $NodeId = $hash->{NodeID};
+  my $Command = "\x03\x10";
+  my $SessionID = KLF200Node_getNextSessionID($hash);
+  Log3($hash, 5, "KLF200Node ($name) KLF200Node_GW_SET_LIMITATION_REQ SessionID $SessionID min:$valueMin max:$valueMax $limitationTime");
+  my $SessionIDShort = pack("n", $SessionID);
+  my $CommandOriginator = "\x08"; #SAAC Stand Alone Automatic Controls 
+  my $PriorityLevel = "\05"; #Comfort Level 2 Used by Stand Alone Automatic Controls 
+  my $IndexArrayCount = pack("C", 1);
+  my $IndexArray = pack("Cx19", $NodeId);
+  my $ParameterID = "\x00";
+  my $ValueMinShort = pack("n", $valueMin);
+  my $ValueMaxShort = pack("n", $valueMax);
+  my $LimitationTimeByte = pack("C", $limitationTime);
+  
+  my $bytes = $Command.$SessionIDShort.$CommandOriginator.$PriorityLevel.$IndexArrayCount.$IndexArray.$ParameterID.$ValueMinShort.$ValueMaxShort.$LimitationTimeByte;
+  return IOWrite($hash, $bytes);
 }
 
 1;
@@ -924,13 +1110,19 @@ sub KLF200Node_GW_LIMITATION_STATUS_NTF($$) {
     </li>
     <li>lastControl<br>
         Name of the last control device. This can be changed in <a href="#KLF200attr">KLF200 attribute controlNames</a><br>
+    </li>
+    <li>limitationMin<br>
+        The minimum allowed state. Moving below this value is blocked. This could be set by sensors or FHEM.
     </li>    
-    <li>productCode<br>
-        This is the product code based on user feedback.<br>
-        If the value is <code>Please report a your device</code> then please report this product
-        at <a href="https://forum.fhem.de/index.php/topic,92907.0.html">FHEM Forum</a>
-        or <a href="https://github.com/buennerbernd/fhem/issues/4">GitHub</a>.<br>
-        Post the product name and a list, e.g. <code>list Velux_1</code><br>
+    <li>limitationMax<br>
+        The maximum allowed state. Moving beyond this value is blocked. This could be set by sensors or FHEM.
+    </li>    
+    <li>limitationMax<br>
+        The maximum allowed state. Moving beyond this value is blocked. This could be set by sensors or FHEM.
+    </li>    
+    <li>limitationUpdateInterval<br>
+        Defines how often to poll the values of limitationMin and limitationMax from the device.<br>
+        See command <code>set limitationUpdateInterval</code> below.
     </li>    
   </ul><br>
   <a name="KLF200Nodeset"></a>
@@ -980,6 +1172,7 @@ sub KLF200Node_GW_LIMITATION_STATUS_NTF($$) {
       Like <code>set &lt;name&gt; &lt;up|down|stop&gt; [DEFAULT|FAST|SILENT]</code><br>
       <br>
     </li>
+    <a name="toggle"></a>
     <li>
       <code>set &lt;name&gt; toggle [DEFAULT|FAST|SILENT]</code><br>
       <br>
@@ -988,10 +1181,48 @@ sub KLF200Node_GW_LIMITATION_STATUS_NTF($$) {
       If pct >= 50 set pct 0<br>
       <br>
     </li>
+    <a name="limitationMin"></a>
+    <li>
+      <code>set &lt;name&gt; limitationMin &lt;0 - 100&gt;</code><br>
+      <br>
+      Set the minimum allowed state. Moving below this value is blocked.<br>
+      If pct &lt; limitationMin the state of the device will be aligned<br>
+      <br>
+    </li>
+    <a name="limitationMax"></a>
+    <li>
+      <code>set &lt;name&gt; limitationMax &lt;0 - 100&gt;</code><br>
+      <br>
+      Set the maximum allowed state. Moving beyond this value is blocked.<br>
+      If pct &gt; limitationMax the state of the device will be aligned<br>
+      <br>
+    </li>
+    <a name="limitationUpdateInterval"></a>
+    <li>
+      <code>set &lt;name&gt; limitationUpdateInterval off|onChange|&lt;s&gt;</code><br>
+      <br>
+      Defines how often to poll the values of limitationMin and limitationMax from the device.<br>
+      off: If the device doesn't have an integrated sensor nor you have any other device besides from FHEM
+      that modifies the limitation, off is the best value.<br>
+      onChange: If the device has an integrated sensor, but it is good enough to update
+      when the device state has changed, onChange is the best value.<br>
+      interval in s: If the device has an integrated sensor and you always want to know how the sensor
+      has modified the limitation, define an update interval. 
+      Proposal: 600, not below 120.<br>
+      Default is off.
+      <br>
+      Examples:
+      <ul>
+        <code>set Velux_1 limitationUpdateInterval 600</code><br>
+        <code>set Velux_2 limitationUpdateInterval off</code><br>
+        <code>set Velux_3 limitationUpdateInterval onChange</code><br>
+      </ul>
+    </li>
   </ul><br>
   <a name="KLF200Nodeattr"></a>
   <b>Attributes</b><br><br>
   <ul>
+    <a name="velocity"></a>
     <li>velocity<br>
         Defines the speed of the actuators when running a command. The optional parameter at the set command has a higher priority.<br>
         Values can be DEFAULT, FAST or SILENT. The default value is DEFAULT.<br>
@@ -999,6 +1230,7 @@ sub KLF200Node_GW_LIMITATION_STATUS_NTF($$) {
         This setting is not used for scenes. See <a href="#KLF200attr">KLF200 attribute velocity</a><br>
         <br>
     </li>
+    <a name="directionOn"></a>
     <li>directionOn<br>
         Defines the meaning of <code>on</code> and 100%.
         Values can be <code>up</code> and <code>down</code>. By default the direction of <code>on</code> is mapped to <code>up</code>.<br>

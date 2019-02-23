@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 35035 2019-09-02 20:52:05Z buennerbernd $
+# $Id: 83_KLF200.pm 35158 2019-23-02 21:23:34Z buennerbernd $
 #
 ##############################################################################
 
@@ -860,7 +860,7 @@ sub KLF200_GW_SESSION_FINISHED_NTF($$) {
   my ($commandHex, $SessionID) = unpack("H4 n", $bytes);
   Log3($hash, 5, "KLF200 ($name) GW_SESSION_FINISHED_NTF $commandHex $SessionID");
   
-  KLF200_Dequeue($hash, qr/^(\x04\x12|\x03\x05|\x03\x12)/, $SessionID); #GW_ACTIVATE_SCENE_REQ, GW_STATUS_REQUEST_REQ, GW_GET_LIMITATION_STATUS_REQ
+  KLF200_Dequeue($hash, qr/^(\x04\x12|\x03\x05|\x03\x12|\x03\x10)/, $SessionID); #GW_ACTIVATE_SCENE_REQ, GW_STATUS_REQUEST_REQ, GW_GET_LIMITATION_STATUS_REQ, GW_SET_LIMITATION_REQ
   return;  
 }
 
@@ -1026,6 +1026,7 @@ sub KLF200_GW_ERROR_NTF($$) {
   <a name="KLF200attr"></a>
   <b>Attributes</b><br><br>
   <ul>
+    <a name="controlNames"></a>
     <li>controlNames<br>
         A comma-separated list of input device name mappings.<br>
         The format is <code>&lt;6 digit hex address&gt;-&lt;command originator number&gt;:&lt;control name&gt;</code>.<br>
@@ -1033,15 +1034,17 @@ sub KLF200_GW_ERROR_NTF($$) {
         <code>895e97-1:Wandtaster,895e97-8:FHEM,ecedd7-1:Fernbedienung</code><br>
         <br>
     </li>
+    <a name="velocity"></a>
     <li>velocity<br>
         Defines the speed of the actuators when running a scene. The optional parameter at the set function has a higher priority.<br>
         Values can be DEFAULT, FAST or SILENT. The default value is DEFAULT.<br>
         Note that older actuators don't support setting velocity.<br>
         <br>
     </li>
+    <a name="autoReboot"></a>
     <li>autoReboot<br>
         Values can be 0 for off and 1 for on, default is on.<br>
-        Reboot the KLF200 box if connection was lost. Reason: The KLF200 box support only two TCP sockets.
+        Reboot the KLF200 box if connection was lost. Reason: The KLF200 box supports only two TCP sockets.
         If the connection was broken a socket is unusable in most cases. So a reboot ensures that always a second socket is available.<br>
         <br>
     </li>
