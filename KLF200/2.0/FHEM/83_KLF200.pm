@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 35158 2019-23-02 21:23:34Z buennerbernd $
+# $Id: 83_KLF200.pm 35280 2019-26-02 22:02:57Z buennerbernd $
 #
 ##############################################################################
 
@@ -359,7 +359,7 @@ sub KLF200_WriteDirect($$) {
   
   DevIo_SimpleWrite($hash, $bytes, 0);
 
-  RemoveInternalTimer($hash);
+  RemoveInternalTimer($hash, "KLF200_GW_GET_STATE_REQ");
   InternalTimer( gettimeofday() + 600, "KLF200_GW_GET_STATE_REQ", $hash); #call after 10 minutes to keep alive
   InternalTimer( gettimeofday() + 5, "KLF200_connectionBroken", $hash); #the box answers in 1s, assume after 5s the connection is broken
   return;
@@ -393,8 +393,10 @@ sub KLF200_RunQueue($) {
 
 sub KLF200_DispatchToNode($$) {
   my ($hash, $bytes) = @_;
+  my $name = $hash->{NAME};
   my $found = Dispatch($hash, $bytes);
   if (not defined($found)) {
+    Log3($name, 1, "KLF200 ($name) - new Node found, updateAll"); 
     RemoveInternalTimer($hash, "KLF200_UpdateAll");
     InternalTimer( gettimeofday() + 20, "KLF200_UpdateAll", $hash); #after auto create, update node again in 20 seconds
   };

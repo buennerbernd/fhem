@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 48171 2019-23-02 21:23:34Z buennerbernd $
+# $Id: 83_KLF200Node.pm 49108 2019-26-02 22:02:57Z buennerbernd $
 #
 ##############################################################################
 
@@ -824,14 +824,18 @@ sub KLF200Node_GW_CS_GET_SYSTEMTABLE_DATA_NTF($$) {
           $NodeTypeSubTypeStr = $hash->{".Const"}->{NodeTypeSubType}->{$NodeType}; 
           if (not defined($NodeTypeSubTypeStr)) { $NodeTypeSubTypeStr = $NodeTypeSubTypeNum };
         };
-        my $productType = ReadingsVal($name, "productType", "");
+        my $productType = ReadingsVal($name, "productType", 0);
         my $productCode = $hash->{".Const"}->{ProductCode}->{$ioManufacturerId}->{$NodeTypeSubType}->{$productType};
         my $model = $ioManufacturer;
         $model .= " ".$productCode if (defined($productCode));
         $model .= " ".$NodeTypeSubTypeStr if ($NodeTypeSubTypeStr ne $NodeTypeSubTypeNum);
         if (not defined($productCode)) {
-          $model .= " Type ".$NodeTypeSubTypeNum."-".$productType;
-          $productCode = "Please report your device";
+          $productCode = "Unknown";
+          $model .= " Type ".$NodeTypeSubTypeNum;
+          if ($productType > 0) {
+            $model .= "-".$productType;
+            $productCode = "Please report your device";
+          }
         }
         readingsBeginUpdate($hash);
         readingsBulkUpdateIfChanged($hash, "ioManufacturer", $ioManufacturer, 1);
@@ -1131,6 +1135,7 @@ sub KLF200Node_GW_SET_LIMITATION_REQ($$$$) {
     <li>
       <code>set &lt;name&gt; &lt;up|down|stop&gt; [DEFAULT|FAST|SILENT]</code><br>
       <br>
+      Like <code>set &lt;name&gt; execution &lt;up|down|stop&gt; [DEFAULT|FAST|SILENT]</code><br>
       Do the same as usual io-homecontrol remote controls with button up, down and stop.<br>
       The second optional parameter defines the velocity of the actuator for this command.
       If this parameter is missing, the attribute <code>velocity</code> is used, see below.<br>
@@ -1139,6 +1144,7 @@ sub KLF200Node_GW_SET_LIMITATION_REQ($$$$) {
       <ul>
         <code>set Velux_1 up</code><br>
         <code>set Velux_2 down SILENT</code><br>
+        <code>set Velux_3 stop</code><br>
       </ul>
       <br>
     </li>
@@ -1151,6 +1157,7 @@ sub KLF200Node_GW_SET_LIMITATION_REQ($$$$) {
       If this parameter is missing, the attribute <code>velocity</code> is used, see below.<br>
       <br>
     </li>
+    <a name="pct"></a>
     <li>
       <code>set &lt;name&gt; pct &lt;0 - 100&gt; [DEFAULT|FAST|SILENT]</code><br>
       <br>
@@ -1166,10 +1173,20 @@ sub KLF200Node_GW_SET_LIMITATION_REQ($$$$) {
       </ul>
       <br>
     </li>
+    <a name="execution"></a>
     <li>
       <code>set &lt;name&gt; execution &lt;up|down|stop&gt; [DEFAULT|FAST|SILENT]</code><br>
       <br>
-      Like <code>set &lt;name&gt; &lt;up|down|stop&gt; [DEFAULT|FAST|SILENT]</code><br>
+      Do the same as usual io-homecontrol remote controls with button up, down and stop.<br>
+      The second optional parameter defines the velocity of the actuator for this command.
+      If this parameter is missing, the attribute <code>velocity</code> is used, see below.<br>
+      <br>
+      Examples:
+      <ul>
+        <code>set Velux_1 execution up</code><br>
+        <code>set Velux_2 execution down SILENT</code><br>
+        <code>set Velux_3 execution stop</code><br>
+      </ul>
       <br>
     </li>
     <a name="toggle"></a>
@@ -1186,7 +1203,7 @@ sub KLF200Node_GW_SET_LIMITATION_REQ($$$$) {
       <code>set &lt;name&gt; limitationMin &lt;0 - 100&gt;</code><br>
       <br>
       Set the minimum allowed state. Moving below this value is blocked.<br>
-      If pct &lt; limitationMin the state of the device will be aligned<br>
+      If pct &lt; limitationMin the state of the device will be aligned.<br>
       <br>
     </li>
     <a name="limitationMax"></a>
@@ -1194,7 +1211,14 @@ sub KLF200Node_GW_SET_LIMITATION_REQ($$$$) {
       <code>set &lt;name&gt; limitationMax &lt;0 - 100&gt;</code><br>
       <br>
       Set the maximum allowed state. Moving beyond this value is blocked.<br>
-      If pct &gt; limitationMax the state of the device will be aligned<br>
+      If pct &gt; limitationMax the state of the device will be aligned.<br>
+      <br>
+    </li>
+    <a name="limitationClear"></a>
+    <li>
+      <code>set &lt;name&gt; limitationClear</code><br>
+      <br>
+      Clear all limitations at this device, also limitations that may set by other controlers.<br>
       <br>
     </li>
     <a name="limitationUpdateInterval"></a>
@@ -1202,7 +1226,7 @@ sub KLF200Node_GW_SET_LIMITATION_REQ($$$$) {
       <code>set &lt;name&gt; limitationUpdateInterval off|onChange|&lt;s&gt;</code><br>
       <br>
       Defines how often to poll the values of limitationMin and limitationMax from the device.<br>
-      off: If the device doesn't have an integrated sensor nor you have any other device besides from FHEM
+      off: If the device doesn't have an integrated sensor nor you have any other controler besides from FHEM
       that modifies the limitation, off is the best value.<br>
       onChange: If the device has an integrated sensor, but it is good enough to update
       when the device state has changed, onChange is the best value.<br>
