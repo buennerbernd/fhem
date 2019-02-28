@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 49108 2019-26-02 22:02:57Z buennerbernd $
+# $Id: 83_KLF200Node.pm 49197 2019-28-02 20:25:33Z buennerbernd $
 #
 ##############################################################################
 
@@ -775,10 +775,10 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
     $attr{$name}{alias} = $NodeName if ($NodeName ne ""); #only if name has changed and is not empty   
   }
   readingsBulkUpdateIfChanged($hash, "powerMode", $PowerModeStr, 1);
-  readingsBulkUpdateIfChanged($hash, "productGroup", $ProductGroup, 1);  
-  readingsBulkUpdateIfChanged($hash, "productType", $ProductType, 1);  
-  readingsBulkUpdateIfChanged($hash, "buildNumber", $BuildNumber, 1);
-  if (defined(readingsBulkUpdateIfChanged($hash, "serial", $Serial, 1))) {
+  readingsBulkUpdateIfChanged($hash, "productGroup", $ProductGroup, 1) if ($ProductGroup > 0);  
+  readingsBulkUpdateIfChanged($hash, "productType", $ProductType, 1) if ($ProductType > 0);  
+  readingsBulkUpdateIfChanged($hash, "buildNumber", $BuildNumber, 1) if ($BuildNumber > 0);
+  if (($Serial ne "0 0 0 0 0 0") and defined(readingsBulkUpdateIfChanged($hash, "serial", $Serial, 1))) {
     my $year = 2000 + $Serial4;
     my (undef,undef,undef,undef,undef,$maxYear,undef,undef,undef) = localtime();
     $maxYear += 1900;
@@ -830,7 +830,6 @@ sub KLF200Node_GW_CS_GET_SYSTEMTABLE_DATA_NTF($$) {
         $model .= " ".$productCode if (defined($productCode));
         $model .= " ".$NodeTypeSubTypeStr if ($NodeTypeSubTypeStr ne $NodeTypeSubTypeNum);
         if (not defined($productCode)) {
-          $productCode = "Unknown";
           $model .= " Type ".$NodeTypeSubTypeNum;
           if ($productType > 0) {
             $model .= "-".$productType;
@@ -841,7 +840,7 @@ sub KLF200Node_GW_CS_GET_SYSTEMTABLE_DATA_NTF($$) {
         readingsBulkUpdateIfChanged($hash, "ioManufacturer", $ioManufacturer, 1);
         readingsBulkUpdateIfChanged($hash, "nodeTypeSubType", $NodeTypeSubTypeStr, 1);
         readingsBulkUpdateIfChanged($hash, "model", $model, 1);
-        readingsBulkUpdateIfChanged($hash, "productCode", $productCode, 1);
+        readingsBulkUpdateIfChanged($hash, "productCode", $productCode, 1) if (defined($productCode));
         readingsBulkUpdateIfChanged($hash, "actuatorAddress", $ActuatorAddress, 1);
         readingsBulkUpdateIfChanged($hash, "backboneReferenceNumber", $BackboneReferenceNumber, 1);
         readingsEndUpdate($hash, 1);
