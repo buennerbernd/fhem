@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 49197 2019-28-02 20:25:33Z buennerbernd $
+# $Id: 83_KLF200Node.pm 49583 2019-04-03 20:48:47Z buennerbernd $
 #
 ##############################################################################
 
@@ -295,11 +295,7 @@ sub KLF200Node_Set($$$) {
   }
   if($cmd eq "toggle") {
     my $velocity = shift @a;
-    my $value;
-    if    (ReadingsVal($hash->{NAME}, "operatingState", "") eq "Executing") { $value = "stop" }
-    elsif (ReadingsVal($hash->{NAME}, "pct", 0) < 50)                       { $value = 100 }
-    else                                                                    { $value = 0 }
-    return KLF200Node_SetState($hash, $value, $velocity);
+    return KLF200Node_SetState($hash, KLF200Node_ToggleCmd($hash), $velocity);
   }
   if ($cmd eq "target") { 
     return KLF200Node_SetState($hash, "target", "DEFAULT");
@@ -456,6 +452,20 @@ sub KLF200Node_SetLimitationUpdateInterval($$) {
   if (not defined($interval) or (not $interval =~ /^(off|onChange|\d+)$/)) {$interval = "off"};
   readingsSingleUpdate($hash, "limitationUpdateInterval", $interval, 1);
   KLF200Node_UpdateLimitation($hash);
+}
+
+sub KLF200Node_ToggleCmd($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  
+  my $value;
+  if (ReadingsVal($hash->{NAME}, "execution", "stop") eq "stop") {
+    my $mid = (ReadingsVal($hash->{NAME}, "limitationMin", 0) + ReadingsVal($hash->{NAME}, "limitationMax", 100)) / 2;
+    if (ReadingsVal($hash->{NAME}, "pct", 0) < $mid) { $value = 100 }
+    else { $value = 0 }
+  }
+  else { $value = "stop" }
+  return $value;
 }
 
 sub KLF200Node_Parse ($$)
@@ -843,6 +853,9 @@ sub KLF200Node_GW_CS_GET_SYSTEMTABLE_DATA_NTF($$) {
         readingsBulkUpdateIfChanged($hash, "productCode", $productCode, 1) if (defined($productCode));
         readingsBulkUpdateIfChanged($hash, "actuatorAddress", $ActuatorAddress, 1);
         readingsBulkUpdateIfChanged($hash, "backboneReferenceNumber", $BackboneReferenceNumber, 1);
+        if (($NodeTypeSubType == 0x0101) and not defined(ReadingsVal($name, "limitationUpdateInterval", undef))) {
+          readingsBulkUpdate($hash, "limitationUpdateInterval", "onChange", 1); #Default value for rain sensor
+        }
         readingsEndUpdate($hash, 1);
         $result = $name if (not defined($result));
       }

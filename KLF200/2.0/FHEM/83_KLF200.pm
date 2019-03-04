@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 35280 2019-28-02 20:25:33Z buennerbernd $
+# $Id: 83_KLF200.pm 35357 2019-04-03 20:48:47Z buennerbernd $
 #
 ##############################################################################
 
@@ -517,6 +517,8 @@ sub KLF200_getControlName($$$) {
 sub KLF200_addControlName($$$) {
   my ($hash, $controlId, $controlName) = @_;
   my $name = $hash->{NAME};
+  
+  Log3($name, 1, "KLF200 $name: addControlName $controlId:$controlName");
   my $controlNamesAttr = AttrVal($name, "controlNames", "");
   $controlNamesAttr .= "," if ($controlNamesAttr ne "");
   $controlNamesAttr .= $controlId.":".$controlName;
