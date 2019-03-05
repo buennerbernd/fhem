@@ -43,11 +43,9 @@ When your devices are successfully created, please call
 
     fheminfo send
     
-to be part of the [anonymous device statistics](https://fhem.de/stats/statistics.html).
+to be part of the [anonymous device statistics](https://fhem.de/stats/statistics.html). (Search for KLF200Node to see models, that are already in use.)
 
 So I have the chance to see if new devices must be supported.
-
-Search for KLF200Node to see models, that are already in use.
 
 [FHEM Forum: Velux KLF200 mit Firmware 2.0.0.71 für io-homecontrol](https://forum.fhem.de/index.php/topic,92907.0.html)
 
