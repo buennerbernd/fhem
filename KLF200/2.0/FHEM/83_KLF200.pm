@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 35357 2019-04-03 20:48:47Z buennerbernd $
+# $Id: 83_KLF200.pm 35121 2019-15-03 21:41:38Z buennerbernd $
 #
 ##############################################################################
 
@@ -200,15 +200,11 @@ sub KLF200_Read($) {
   elsif ($command eq "\x00\x02") { KLF200_GW_REBOOT_CFM($hash, $bytes) }
   elsif ($command eq "\x00\x00") { KLF200_GW_ERROR_NTF($hash, $bytes) }
   elsif ($command eq "\x03\x01") { KLF200_GW_COMMAND_SEND_CFM($hash, $bytes) }
-  elsif ($command eq "\x03\x02") { KLF200_DispatchToNode($hash, $bytes) }
-  elsif ($command eq "\x03\x03") { KLF200_DispatchToNode($hash, $bytes) }
-  elsif ($command eq "\x03\x07") { KLF200_DispatchToNode($hash, $bytes) }
-  elsif ($command eq "\x03\x14") { KLF200_DispatchToNode($hash, $bytes) }
-  elsif ($command eq "\x02\x11") { KLF200_DispatchToNode($hash, $bytes) }
-  elsif ($command eq "\x02\x04") { KLF200_DispatchToNode($hash, $bytes) }
-  elsif ($command eq "\x02\x10") { KLF200_DispatchToNode($hash, $bytes) }
-  elsif ($command eq "\x01\x02") { KLF200_DispatchToNode($hash, $bytes) }
-  else  { Log3($name, 1, "KLF200 ($name) - ignored:  $hexString") }     
+  elsif ($command =~ /^(\x01\x02|\x02\x04|\x02\x10|\x02\x11|\x03\x02|\x03\x03|\x03\x07|\x03\x14)$/)
+                                 { KLF200_DispatchToNode($hash, $bytes) }
+  elsif ($command =~ /^(\x01\x01|\x02\x03|\x03\x06|\x03\x13)$/)
+                                 { Log3($name, 5, "KLF200 ($name) - ignored:  $hexString") }
+  else                           { Log3($name, 1, "KLF200 ($name) - unknown:  $hexString") }     
 }
 
 # called if set command is executed

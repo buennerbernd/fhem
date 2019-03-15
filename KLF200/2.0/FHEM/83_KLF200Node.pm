@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 49583 2019-04-03 20:48:47Z buennerbernd $
+# $Id: 83_KLF200Node.pm 49744 2019-15-03 21:41:38Z buennerbernd $
 #
 ##############################################################################
 
@@ -308,7 +308,7 @@ sub KLF200Node_Set($$$) {
     return KLF200Node_UpdateStatus($hash);
   }
   if ($cmd eq "updateLimitation") {
-    return KLF200Node_UpdateLimitation($hash);
+    return KLF200Node_UpdateLimitation($hash, "onChange");
   }
   if ($cmd eq "limitationClear") {
     return KLF200Node_SetLimitation($hash, undef, undef);
@@ -351,12 +351,12 @@ sub KLF200Node_Set($$$) {
   return $usage;
 }
 
-sub KLF200Node_UpdateLimitation($) {
-  my ($hash,) = @_;
+sub KLF200Node_UpdateLimitation($;$) {
+  my ($hash, $limitationUpdateInterval) = @_;
   my $name = $hash->{NAME};
   
   RemoveInternalTimer($hash, "KLF200Node_UpdateLimitation");
-  my $limitationUpdateInterval = ReadingsVal($name, "limitationUpdateInterval", "off");
+  $limitationUpdateInterval = ReadingsVal($name, "limitationUpdateInterval", "off") if (not defined($limitationUpdateInterval));
   if ($limitationUpdateInterval eq "off") { return undef };
   if (ReadingsVal($name, "execution", "stop") ne "stop") {
     #defer if executing
@@ -995,7 +995,7 @@ sub KLF200Node_GW_GET_LIMITATION_STATUS_REQ($$) {
   my $NodeId = $hash->{NodeID};
   my $Command = "\x03\x12";
   my $SessionID = KLF200Node_getNextSessionID($hash);
-  Log3($hash, 1, "KLF200Node ($name) KLF200Node_GW_GET_LIMITATION_STATUS_REQ SessionID $SessionID LimitationType $limitationType");
+  Log3($hash, 5, "KLF200Node ($name) KLF200Node_GW_GET_LIMITATION_STATUS_REQ SessionID $SessionID LimitationType $limitationType");
   my $SessionIDShort = pack("n", $SessionID);
   my $IndexArrayCount = pack("C", 1);
   my $IndexArray = pack("Cx19", $NodeId);
@@ -1023,13 +1023,13 @@ sub KLF200Node_GW_LIMITATION_STATUS_NTF($$) {
   readingsBeginUpdate($hash);
   if ($MinValue<=0xC800) {
     my $pct = KLF200Node_RawToPct($hash, $MinValue);
-    if ($directionOn eq "up") { $limitationMax = readingsBulkUpdateIfChanged($hash, "limitationMax", $pct, 1) }
-    else                      { $limitationMin = readingsBulkUpdateIfChanged($hash, "limitationMin", $pct, 1) }    
+    if ($directionOn eq "up") { if (defined(readingsBulkUpdateIfChanged($hash, "limitationMax", $pct, 1))) {$limitationMax = $pct}}
+    else                      { if (defined(readingsBulkUpdateIfChanged($hash, "limitationMin", $pct, 1))) {$limitationMin = $pct}}    
   }
   if ($MaxValue<=0xC800) {
     my $pct = KLF200Node_RawToPct($hash, $MaxValue);
-    if ($directionOn eq "up") { $limitationMin = readingsBulkUpdateIfChanged($hash, "limitationMin", $pct, 1) }
-    else                      { $limitationMax = readingsBulkUpdateIfChanged($hash, "limitationMax", $pct, 1) }    
+    if ($directionOn eq "up") { if (defined(readingsBulkUpdateIfChanged($hash, "limitationMin", $pct, 1))) {$limitationMin = $pct}}
+    else                      { if (defined(readingsBulkUpdateIfChanged($hash, "limitationMax", $pct, 1))) {$limitationMax = $pct}}    
   }
   readingsEndUpdate($hash, 1);
   
