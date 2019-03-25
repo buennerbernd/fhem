@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 49744 2019-15-03 21:41:38Z buennerbernd $
+# $Id: 83_KLF200Node.pm 49751 2019-25-03 13:48:44Z buennerbernd $
 #
 ##############################################################################
 
@@ -11,6 +11,7 @@ package main;
 use strict;
 use warnings;
 use Encode;
+use SetExtensions;
 
 sub KLF200Node_Initialize($) {
   my ($hash) = @_;
@@ -336,8 +337,7 @@ sub KLF200Node_Set($$$) {
     return KLF200Node_SetLimitationUpdateInterval($hash, $interval);
   }
   
-  my $usage= "Unknown argument $cmd, choose one of";
-  $usage .= " on:noArg off:noArg toggle:noArg up:noArg down:noArg stop:noArg" ;
+  my $usage= " on:noArg off:noArg toggle:noArg up:noArg down:noArg stop:noArg" ;
   $usage .= " pct:slider,0,1,100" ;
   $usage .= " execution:up,down,stop" ;
 #  $usage .= " statusRequest:Main_info,Target_position,Current_position,Remaining_time" ;
@@ -348,7 +348,8 @@ sub KLF200Node_Set($$$) {
   $usage .= " limitationMax:slider,0,1,100" ;  
   $usage .= " limitationUpdateInterval" ;  
 #  $usage .= " target:noArg" ;
-  return $usage;
+
+  return SetExtensions($hash, $usage, $name, $cmd, @a);
 }
 
 sub KLF200Node_UpdateLimitation($;$) {
