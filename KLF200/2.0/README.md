@@ -64,4 +64,6 @@ So I have the chance to see if new devices must be supported.
 
 [FHEM Forum: Velux KLF200 mit Firmware 2.0.0.71 für io-homecontrol](https://forum.fhem.de/index.php/topic,92907.0.html)
 
-[FHEM Wiki: Velux KLF200](https://wiki.fhem.de/wiki/KLF200)
+[FHEM Wiki german: Velux KLF200](https://wiki.fhem.de/wiki/KLF200)
+
+[FHEM Wiki english translation: Velux KLF200](http://translate.google.com/translate?hl=&sl=de&tl=en&u=https%3A%2F%2Fwiki.fhem.de%2Fwiki%2FKLF200)
