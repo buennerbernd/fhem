@@ -11,6 +11,21 @@ These modules integrate any io-homecontrol actor into the open source smarthome 
 - Module 83_KLF200.pm represents the KLF200 box.
 - Module 83_KLF200Node.pm represents the devices, managed by the KLF200 box.
 
+IO-homecontrol devices with positive feedback by users of the KLF200 modules:
+
+* Roller Shutter:
+  * VELUX SML
+  * VELUX SSL
+  * Somfy Oximo io
+* Vertical Interior Blinds:
+  * VELUX FSK
+* Window opener with integrated rain sensor:
+  * VELUX KMG
+  * VELUX CVP
+  * VELUX KSX
+* Horizontal awning:
+  * Somfy Sunea io
+
 Load the modules into FHEM:
 
     update all https://raw.githubusercontent.com/buennerbernd/fhem/master/KLF200/2.0/controls_KLF200.txt
