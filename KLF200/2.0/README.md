@@ -4,9 +4,20 @@
 
 My own implementation to support the Velux KLF200 box with firmware version 2.0.0.71 in [FHEM](https://www.fhem.de/).
 
-https://www.velux.com/api/klf200
+This FHEM integration supports unique io-homecontrol features:
+* Control device positions per percent individually and simultaneously
+* Simple controls like up, down and stop
+* Activate scenes
+* Get feedback from devices like position and success/error messages even if controlled by other remotes
+* Set the velocity, if supported by device
+* Set and read limitations
+* Evaluate the rain sensor of Velux window openers
 
-These modules integrate any io-homecontrol actor into the open source smarthome solution FHEM by KLF-200.
+Because of FHEM supports MQTT, this module might be also usefull for other house automation systems.
+
+KLF200 API documentation and firmware download: https://www.velux.com/api/klf200
+
+These modules integrate any io-homecontrol actuator into the open source smart-home solution FHEM by KLF-200.
 
 - Module 83_KLF200.pm represents the KLF200 box.
 - Module 83_KLF200Node.pm represents the devices, managed by the KLF200 box.
@@ -64,6 +75,6 @@ So I have the chance to see if new devices must be supported.
 
 [FHEM Forum: Velux KLF200 mit Firmware 2.0.0.71 für io-homecontrol](https://forum.fhem.de/index.php/topic,92907.0.html)
 
-[FHEM Wiki german: Velux KLF200](https://wiki.fhem.de/wiki/KLF200)
+[FHEM Wiki German: Velux KLF200](https://wiki.fhem.de/wiki/KLF200)
 
-[FHEM Wiki english translation: Velux KLF200](http://translate.google.com/translate?hl=&sl=de&tl=en&u=https%3A%2F%2Fwiki.fhem.de%2Fwiki%2FKLF200)
+[FHEM Wiki English translation: Velux KLF200](http://translate.google.com/translate?hl=&sl=de&tl=en&u=https%3A%2F%2Fwiki.fhem.de%2Fwiki%2FKLF200)
