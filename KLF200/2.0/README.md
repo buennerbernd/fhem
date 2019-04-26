@@ -9,7 +9,7 @@ This FHEM integration supports unique io-homecontrol features:
 * Simple controls like up, down and stop
 * Activate scenes
 * Get feedback from devices like position and success/error messages even if controlled by other remotes
-* Set the velocity, if supported by device
+* Set the velocity (fast, silent) if supported by device
 * Set and read limitations
 * Evaluate the rain sensor of Velux window openers
 
