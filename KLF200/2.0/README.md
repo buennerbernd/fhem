@@ -13,7 +13,7 @@ This FHEM integration supports unique io-homecontrol features:
 * Set and read limitations
 * Evaluate the rain sensor of Velux window openers
 
-Because of FHEM supports MQTT, this module might be also usefull for other house automation systems.
+Because of FHEM supports MQTT, this module might be also useful for other house automation systems.
 
 KLF200 API documentation and firmware download: https://www.velux.com/api/klf200
 
@@ -58,7 +58,7 @@ Once your device is defined, you have to enter the password:
 
     set <name> login <password>
 
-As password use the Wifi password, printed at the bottom of the box. If this doesn't work, please try the password of the WebUI of the KLF200. The password will be stored obfuscated in the FHEM backend and is optional for further login calls.
+As password use the WIFI password, printed at the bottom of the box. If this doesn't work, please try the password of the WebUI of the KLF200. The password will be stored obfuscated in the FHEM backend and is optional for further login calls.
 After login the devices will be created by auto create as instances of KLF200Node.
 
 The device name of the nodes will be name_NodeID, but the names from the KLF200 Web UI will be set as alias.
