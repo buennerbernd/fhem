@@ -36,6 +36,8 @@ IO-homecontrol devices with positive feedback by users of the KLF200 modules:
   * VELUX KSX
 * Horizontal awning:
   * Somfy Sunea io
+* Vertical Exterior Awning
+  * VELUX MSL
 
 Load the modules into FHEM:
 
