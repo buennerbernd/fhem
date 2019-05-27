@@ -30,6 +30,7 @@ IO-homecontrol devices with positive feedback by users of the KLF200 modules:
   * Somfy Oximo io
 * Vertical Interior Blinds:
   * VELUX FSK
+  * VELUX DML
 * Window opener with integrated rain sensor:
   * VELUX KMG
   * VELUX CVP
