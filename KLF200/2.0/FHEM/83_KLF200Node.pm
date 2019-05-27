@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 49826 2019-11-05 14:59:00Z buennerbernd $
+# $Id: 83_KLF200Node.pm 49842 2019-27-05 07:58:47Z buennerbernd $
 #
 ##############################################################################
 
@@ -200,6 +200,7 @@ sub KLF200Node_InitTexts($) {
   };
   $hash->{".Const"}->{ProductCode}->{1}->{0x0280} = {
     5 => "FSK",
+    6 => "DML",
   };
   $hash->{".Const"}->{StatusID} = {
     0x01 => "USER",
