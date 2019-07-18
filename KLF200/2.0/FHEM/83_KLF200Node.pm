@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 49842 2019-27-05 07:58:47Z buennerbernd $
+# $Id: 83_KLF200Node.pm 50445 2019-18-07 20:24:28Z buennerbernd $
 #
 ##############################################################################
 
@@ -650,6 +650,8 @@ sub KLF200Node_GW_COMMAND_RUN_STATUS_NTF($$) {
     # Info to KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF: GW_STATUS_REQUEST_REQ isn't necessary
     # exept the operatingState is Done, then no direct GW_NODE_STATE_POSITION_CHANGED_NTF will follow
     $hash->{".UpdateStatus"} = "NO" if ( ReadingsVal($name, "operatingState", "Done") ne "Done");
+    $hash->{".UpdateStatus"} = "YES" if ($StatusReply == 0x07); #"REACHED WRONG POSITION" workaround for IZYMO
+    $hash->{".UpdateStatus"} = "YES" if ($StatusReply == 0x0E); #"MOTION TIME TOO LONG  COMMUNICATION ENDED"
   }
   else {
     KLF200Node_BulkUpdateFP($hash, $NodeParameter, $ParameterValue);
@@ -723,12 +725,14 @@ sub KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($$) {
   if ((ReadingsVal($name, "lastRunStatus", "") ne "EXECUTION ACTIVE")) {
     #Otherwhise it could destroy a running session
     my $updateLimitation = delete($hash->{".UpdateLimitation"});
-    if(defined($changed)) {
-      $updateLimitation = "YES";
-      my $updateStatus = delete($hash->{".UpdateStatus"});
+    my $updateStatus = delete($hash->{".UpdateStatus"});
+    if(defined($changed) or defined($targetArrival) or (defined($updateStatus) and ($updateStatus eq "YES"))) {
       $updateStatus = "YES" if (not defined($updateStatus));
+      $updateStatus = "YES" if (($updateStatus eq "IF EXECUTING") and $State == 4 );
+      Log3($hash, 5, "KLF200Node ($name) GW_NODE_STATE_POSITION_CHANGED_NTF updateStatus $updateStatus");
       if ($updateStatus eq "YES") {
         if(defined($targetArrival)) {
+          Log3($hash, 5, "KLF200Node ($name) GW_NODE_STATE_POSITION_CHANGED_NTF targetArrival $targetArrival");
           InternalTimer( $targetArrival, "KLF200Node_UpdateStatus", $hash);
         }
         else {     
@@ -736,7 +740,7 @@ sub KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($$) {
         }
       }
     }
-    if (defined($updateLimitation)) {
+    if (defined($updateLimitation) or defined($changed)) {
       KLF200Node_UpdateLimitation($hash);  
     }
   }
@@ -969,7 +973,7 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
     readingsBulkUpdateIfChanged($hash, "lastCommandOriginator", $LastCommandOriginatorStr, 1);
     readingsBulkUpdateIfChanged($hash, "lastControl", $LastControl, 1);
     # Info to KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF: GW_STATUS_REQUEST_REQ isn't necessary 
-    $hash->{".UpdateStatus"} = "NO";
+    $hash->{".UpdateStatus"} = "IF EXECUTING";
   }
   else {
     my $StatusCount = unpack("C", substr($bytes, 9, 1));
