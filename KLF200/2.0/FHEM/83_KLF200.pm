@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 35121 2019-18-07 20:24:28Z buennerbernd $
+# $Id: 83_KLF200.pm 35313 2019-24-07 19:51:13Z buennerbernd $
 #
 ##############################################################################
 
@@ -202,7 +202,7 @@ sub KLF200_Read($) {
   elsif ($command eq "\x03\x01") { KLF200_GW_COMMAND_SEND_CFM($hash, $bytes) }
   elsif ($command =~ /^(\x01\x02|\x02\x04|\x02\x10|\x02\x11|\x03\x02|\x03\x03|\x03\x07|\x03\x14)$/)
                                  { KLF200_DispatchToNode($hash, $bytes) }
-  elsif ($command =~ /^(\x01\x01|\x02\x03|\x03\x06|\x03\x13)$/)
+  elsif ($command =~ /^(\x01\x01|\x02\x03|\x03\x06|\x03\x13|\x05\x06)$/)
                                  { Log3($name, 5, "KLF200 ($name) - ignored:  $hexString") }
   else                           { Log3($name, 1, "KLF200 ($name) - unknown:  $hexString") }     
 }
@@ -644,13 +644,17 @@ sub KLF200_GW_GET_STATE_CFM($$) {
   my ($commandHex, $GatewayState, $SubState, $StateData) = unpack("H4 C C n", $bytes);
   Log3($hash, 5, "KLF200 ($name) GW_GET_STATE_CFM $commandHex $GatewayState $SubState $StateData");
 
-  if (($GatewayState) == 2 or ($GatewayState == 1)) {
+  if (($GatewayState == 2) or ($GatewayState == 1)) {
     my $SubStateStr = KLF200_GetText($hash, "SubState", $SubState);
     readingsSingleUpdate($hash, "subState", $SubStateStr, 1);
     
-    #If the box is in idle state and the queue is not empty: run the queue.
-    #This should never happen, just to be on the safe side.
-    KLF200_RunQueue($hash) if ($SubState == 0x00);
+    my $queueSize = ReadingsVal($name, "queueSize", 0);    
+    if ($queueSize > 0) {
+      #If the queue is not empty: run the queue.
+      #This should never happen, just to be on the safe side.
+      Log3($hash, 1, "KLF200 ($name) GW_GET_STATE_CFM Queue is not empty! Run queue again. queueSize $queueSize subState $SubStateStr");
+      KLF200_RunQueue($hash);
+    }
   }  
   return;
 }
