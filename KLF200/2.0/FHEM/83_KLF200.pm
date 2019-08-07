@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 35313 2019-24-07 19:51:13Z buennerbernd $
+# $Id: 83_KLF200.pm 35365 2019-07-08 19:25:20Z buennerbernd $
 #
 ##############################################################################
 
@@ -650,10 +650,10 @@ sub KLF200_GW_GET_STATE_CFM($$) {
     
     my $queueSize = ReadingsVal($name, "queueSize", 0);    
     if ($queueSize > 0) {
-      #If the queue is not empty: run the queue.
+      #If the queue is not empty: Remove first request from the queue and run the queue.
       #This should never happen, just to be on the safe side.
       Log3($hash, 1, "KLF200 ($name) GW_GET_STATE_CFM Queue is not empty! Run queue again. queueSize $queueSize subState $SubStateStr");
-      KLF200_RunQueue($hash);
+      KLF200_Dequeue($hash, undef, undef);
     }
   }  
   return;
@@ -918,7 +918,7 @@ sub KLF200_GW_ERROR_NTF($$) {
   readingsSingleUpdate($hash, "lastError", $lastError, 1);
   Log3($name, 1, "KLF200 ($name) - Gateway Error: $lastError");
   if ($lastError ne "Busy. Try again later.") {
-    KLF200_Dequeue($hash, qr/.*/, undef); #last request
+    KLF200_Dequeue($hash, undef, undef); #last request
   }
   return;  
 }
