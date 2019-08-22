@@ -3,14 +3,13 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 50445 2019-07-08 19:25:20Z buennerbernd $
+# $Id: 83_KLF200Node.pm 50390 2019-22-08 07:16:17Z buennerbernd $
 #
 ##############################################################################
 
 package main;
 use strict;
 use warnings;
-use Encode;
 use SetExtensions;
 
 sub KLF200Node_Initialize($) {
@@ -774,7 +773,7 @@ sub KLF200Node_GW_GET_ALL_NODES_INFORMATION_NTF($$) {
   if (not defined($hash)) {return $undefined};
   
   $NodeName =~ s/\x00+$//;
-  $NodeName = decode("UTF-8", $NodeName);  
+
   my $VelocityStr = KLF200Node_GetText($hash, "VelocitySupport", $Velocity);
   my $NodeVariationStr = KLF200Node_GetText($hash, "NodeVariation", $NodeVariation);
   my $PowerModeStr = KLF200Node_GetText($hash, "PowerMode", $PowerMode);

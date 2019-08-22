@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 35365 2019-07-08 19:25:20Z buennerbernd $
+# $Id: 83_KLF200.pm 35307 2019-22-08 07:16:17Z buennerbernd $
 #
 ##############################################################################
 
@@ -12,7 +12,6 @@ package main;
 use strict;
 use warnings;
 use DevIo; # load DevIo.pm if not already loaded
-use Encode;
 
 # called upon loading the module KLF200
 sub KLF200_Initialize($) {
@@ -772,7 +771,6 @@ sub KLF200_GW_GET_SCENE_LIST_NTF($$) {
     my ($SceneID, $SceneName) = unpack("C a64", $sceneObject);
 
     $SceneName =~ s/\x00+$//;
-    $SceneName = decode("UTF-8", $SceneName);
 
     Log3($hash, 5, "KLF200 ($name) GW_GET_SCENE_LIST_NTF $SceneID $SceneName");
     $hash->{".idToScene"}->{$SceneID}  = $SceneName;
