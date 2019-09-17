@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 35307 2019-22-08 07:16:17Z buennerbernd $
+# $Id: 83_KLF200.pm 35337 2019-17-09 20:32:39Z buennerbernd $
 #
 ##############################################################################
 
@@ -497,7 +497,7 @@ sub KLF200_getControlName($$$) {
     $klf200Address = $masterExecutionAddress;
     readingsSingleUpdate($hash, "address", $klf200Address, 1);
   }
-  if ($klf200Address eq $masterExecutionAddress) {
+  if (defined($klf200Address) and ($klf200Address eq $masterExecutionAddress)) {
     KLF200_addControlName($hash, $klf200Address."-1", "KLF200 Input");
     KLF200_addControlName($hash, $klf200Address."-8", "FHEM");
     return "FHEM" if ($commandOriginator == 8);
