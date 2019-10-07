@@ -81,4 +81,4 @@ So I have the chance to see if new devices must be supported.
 
 [FHEM Wiki German: Velux KLF200](https://wiki.fhem.de/wiki/Velux_KLF200)
 
-[FHEM Wiki English translation: Velux KLF200](translate.google.com/translate?hl=&sl=de&tl=en&u=https%3A%2F%2Fwiki.fhem.de%2Fwiki%2FVelux_KLF200)
+[FHEM Wiki English translation: Velux KLF200](https://translate.google.com/translate?hl=&sl=de&tl=en&u=https%3A%2F%2Fwiki.fhem.de%2Fwiki%2FVelux_KLF200)
