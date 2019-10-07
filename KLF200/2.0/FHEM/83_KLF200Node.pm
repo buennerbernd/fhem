@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 50390 2019-17-09 20:32:39Z buennerbernd $
+# $Id: 83_KLF200Node.pm 50391 2019-07-10 07:25:01Z buennerbernd $
 #
 ##############################################################################
 
@@ -22,7 +22,7 @@ sub KLF200Node_Initialize($) {
   $hash->{ReadFn}     = 'KLF200Node_Read';
   $hash->{ParseFn}    = 'KLF200Node_Parse';
   
-  $hash->{AttrList}   = "directionOn:up,down velocity:DEFAULT,SILENT,FAST" . $readingFnAttributes;
+  $hash->{AttrList}   = "directionOn:up,down velocity:DEFAULT,SILENT,FAST " . $readingFnAttributes;
   $hash->{parseParams}  = 1;
   $hash->{Match}      = ".*";
 
