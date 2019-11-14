@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 50391 2019-07-10 07:25:01Z buennerbernd $
+# $Id: 83_KLF200Node.pm 53683 2019-14-11 15:41:24Z buennerbernd $
 #
 ##############################################################################
 
@@ -281,7 +281,7 @@ sub KLF200Node_Get($@) {
 }
 
 sub KLF200Node_Set($$$) {
-  my ($hash, $argsref, undef) = @_;
+  my ($hash, $argsref, $namedParams) = @_;
   my @a= @{$argsref};
   return "set needs at least one parameter" if(@a < 2);
   
@@ -304,12 +304,18 @@ sub KLF200Node_Set($$$) {
   if ($cmd eq "target") { 
     return KLF200Node_SetState($hash, "target", "DEFAULT");
   }
+  if ($cmd eq "raw") {
+    return KLF200Node_SetRaw($hash, $namedParams);
+  }
   if ($cmd eq "statusRequest") {
     my $statusType = shift @a; 
     return KLF200Node_GW_STATUS_REQUEST_REQ($hash, $statusType);
   }
   if ($cmd eq "updateStatus") {
     return KLF200Node_UpdateStatus($hash);
+  }
+  if ($cmd eq "updateCurrentPosition") {
+    return KLF200Node_UpdateCurrentPosition($hash);
   }
   if ($cmd eq "updateLimitation") {
     return KLF200Node_UpdateLimitation($hash, "onChange");
@@ -343,8 +349,10 @@ sub KLF200Node_Set($$$) {
   my $usage= " on:noArg off:noArg toggle:noArg up:noArg down:noArg stop:noArg" ;
   $usage .= " pct:slider,0,1,100" ;
   $usage .= " execution:up,down,stop" ;
+  $usage .= " raw" ;
 #  $usage .= " statusRequest:Main_info,Target_position,Current_position,Remaining_time" ;
   $usage .= " updateStatus:noArg" ;
+  $usage .= " updateCurrentPosition:noArg" ;
   $usage .= " updateLimitation:noArg" ;
   $usage .= " limitationClear:noArg" ;
   $usage .= " limitationMin:slider,0,1,100" ;
@@ -377,26 +385,57 @@ sub KLF200Node_UpdateLimitation($;$) {
 }
 
 sub KLF200Node_UpdateStatus($) {
-  my ($hash,) = @_;
+  my ($hash) = @_;
   my $name = $hash->{NAME};
   
   return KLF200Node_GW_STATUS_REQUEST_REQ($hash, "Main_info");
+}
+
+sub KLF200Node_UpdateCurrentPosition($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  
+  return KLF200Node_GW_STATUS_REQUEST_REQ($hash, "Current_position");
 }
 
 sub KLF200Node_SetState($$$) {
   my ($hash, $state, $velocity) = @_;
   my $name = $hash->{NAME};
   Log3($name, 5, "KLF200Node ($name) - set $state");
-  my $raw;
-  if    ($state eq "stop") { $raw = 0xD200 }
-  elsif ($state eq "up")   { $raw = 0x0000 }
-  elsif ($state eq "down") { $raw = 0xC800 }
-  elsif ($state eq "target") { $raw = 0xD100 }
-  elsif ($state eq "on")   { $raw = KLF200Node_PctToRaw($hash, 100) }
-  elsif ($state eq "off")  { $raw = KLF200Node_PctToRaw($hash, 0) }
-  else                     { $raw = KLF200Node_PctToRaw($hash, $state) }
+  my $MP;
+  if    ($state eq "stop")   { $MP = 0xD200 }
+  elsif ($state eq "up")     { $MP = 0x0000 }
+  elsif ($state eq "down")   { $MP = 0xC800 }
+  elsif ($state eq "target") { $MP = 0xD100 }
+  elsif ($state eq "on")     { $MP = KLF200Node_PctToRaw($hash, 100) }
+  elsif ($state eq "off")    { $MP = KLF200Node_PctToRaw($hash, 0) }
+  else                       { $MP = KLF200Node_PctToRaw($hash, $state) }
 
-  return KLF200Node_GW_COMMAND_SEND_REQ($hash, $raw, $velocity); 
+  if(not defined($velocity)) { $velocity = AttrVal($name, "velocity", "DEFAULT") }
+  $hash->{"VelocitySet"} = $velocity;
+  
+  my $FP1 = 0xD400;
+  if    ($velocity eq "SILENT") { $FP1 = 0x0000 }
+  elsif ($velocity eq "FAST")   { $FP1 = 0xC800 }
+  
+  my @a = ($MP, $FP1);
+  return KLF200Node_GW_COMMAND_SEND_REQ($hash, 0, \@a); 
+}
+
+sub KLF200Node_SetRaw($$) {
+  my ($hash, $namedParams) = @_;
+  my $name = $hash->{NAME};
+  
+  my $ParameterActive = $namedParams->{ParameterActive};
+  $ParameterActive = 0 if (not defined($ParameterActive)); 
+  my $paramValue = $namedParams->{MP};
+  my @a = ($paramValue);
+  for my $i (1..16) {
+    my $paramName = "FP".$i;
+    $paramValue = $namedParams->{$paramName};
+    push(@a, $paramValue);
+  }
+  return KLF200Node_GW_COMMAND_SEND_REQ($hash, $ParameterActive, \@a); 
 }
 
 sub KLF200Node_SetLimitation($$$) {
@@ -591,10 +630,12 @@ sub KLF200Node_BulkUpdateRemaining($$$) {
 sub KLF200Node_BulkUpdateFP($$$) {
   my ($hash, $fp, $raw) = @_; 
   my $name = $hash->{NAME};
-  
-  my $readingName = "FP".$fp;
-  #Don't create useless readings
-  readingsBulkUpdate($hash, $readingName, $raw, 1) if (ReadingsVal($name, $readingName, 0xF7FF) != $raw);
+  if ( $raw != 0xF7FF) {
+    #Don't create useless readings
+    my $readingName = "FP".$fp;
+    Log3($hash, 5, "KLF200Node ($name) BulkUpdate $readingName:$raw");
+    readingsBulkUpdateIfChanged($hash, $readingName, $raw, 1) ;
+  }
 }
 
 sub KLF200Node_GetHash($$) {
@@ -882,43 +923,41 @@ sub KLF200Node_GW_CS_GET_SYSTEMTABLE_DATA_NTF($$) {
 }
 
 sub KLF200Node_GW_COMMAND_SEND_REQ($$$) {
-  my ($hash, $raw, $velocity) = @_;
+  my ($hash, $ParameterActive, $argsref) = @_;
+  my @a= @{$argsref};
   my $name = $hash->{NAME};    
   my $NodeId = $hash->{NodeID};
   my $Command = "\x03\x00";
   my $SessionID = KLF200Node_getNextSessionID($hash);
-  Log3($hash, 5, "KLF200Node ($name) KLF200Node_GW_COMMAND_SEND_REQ SessionID $SessionID raw $raw");
   my $SessionIDShort = pack("n", $SessionID);
   my $CommandOriginator = "\x08"; #SAAC Stand Alone Automatic Controls 
   my $PriorityLevel = "\05"; #Comfort Level 2 Used by Stand Alone Automatic Controls 
-  my $ParameterActive = "\x00";
+  my $ParameterActiveByte = pack("C", $ParameterActive);
   
-  if(not defined($velocity)) {
-    $velocity = AttrVal($name, "velocity", "DEFAULT");
-    $hash->{"VelocitySet"} = $velocity;
+  my $FPI1FPI2 = 0;
+  my $FunctionalParameterValueArray = "";
+  my $parametersLog = "";
+  for my $i (0..16) { 
+    my $ParameterValue = shift @a;
+    if (not defined($ParameterValue)) {$ParameterValue = 0xD400}; #IGNORE
+    if ($ParameterValue != 0xD400) {
+      $FPI1FPI2 = $FPI1FPI2 | (0x10000 >> $i) if ($i > 0);
+      $parametersLog .= "FP$i:$ParameterValue "; 
+    }    
+    my $ParameterValueShort = pack("n", $ParameterValue);
+    $FunctionalParameterValueArray .= $ParameterValueShort;
   }
-  my $FPI1FPI2;
-  my $FunctionalParameterValueArray;
-  if ($velocity eq "SILENT") {
-    $FPI1FPI2 = "\x80\x00";
-    $FunctionalParameterValueArray = pack("nnx30", $raw, 0);
-  }
-  elsif ($velocity eq "FAST") {
-    $FPI1FPI2 = "\x80\x00";
-    $FunctionalParameterValueArray = pack("nnx30", $raw, 51200);
-  }
-  else {
-    $FPI1FPI2 = "\x00\x00";
-    $FunctionalParameterValueArray = pack("nx32", $raw);
-  }
+  Log3($hash, 5, "KLF200Node ($name) KLF200Node_GW_COMMAND_SEND_REQ SessionID $SessionID ParameterActive $ParameterActive $parametersLog");
+  my $FPI1FPI2Short = pack("n", $FPI1FPI2);
   my $IndexArrayCount = pack("C", 1);
   my $IndexArray = pack("Cx19", $NodeId);
   my $PriorityLevelLock = "\x00\x00\x00\x00";
 
-  my $bytes = $Command.$SessionIDShort.$CommandOriginator.$PriorityLevel.$ParameterActive.$FPI1FPI2
+  my $bytes = $Command.$SessionIDShort.$CommandOriginator.$PriorityLevel.$ParameterActiveByte.$FPI1FPI2Short
     .$FunctionalParameterValueArray.$IndexArrayCount.$IndexArray.$PriorityLevelLock;
   return IOWrite($hash, $bytes);
 }
+
 
 sub KLF200Node_GW_STATUS_REQUEST_REQ($$) {
   my ($hash, $statusType) = @_;
@@ -1218,6 +1257,30 @@ sub KLF200Node_GW_SET_LIMITATION_REQ($$$$) {
       If pct >= 50 set pct 0<br>
       <br>
     </li>
+    <a name="raw"></a>
+    <li>
+      <code>set &lt;name&gt; raw [ParameterActive=&lt;0 - 16&gt;] [MP=&lt;0 - 65535&gt;] [FP1=&lt;0 - 65535&gt;] .. [FP16=&lt;0 - 65535&gt;]</code><br>
+      <br>
+      This setter provides low level access to GW_COMMAND_SEND_REQ of the KLF 200 API.<br>
+      It allows to set and combine the Main Parameter (MP) and Functional Parameter #1 (FP1) to Functional Parameter #16 (FP16)
+      in the original value range.<br>
+      Furthermore it allows to select the ParameterActive to get feedback for this parameter.<br>
+      For more details please have a look at the <a href="https://velcdn.azureedge.net/~/media/com/api/klf200/technical%20specification%20for%20klf%20200%20api-ver3-16.pdf">KLF 200 API</a>
+      chapters:<br>
+      <ul>
+        10.1.1 GW_COMMAND_SEND_REQ<br>
+        10.1.1.4 ParameterActive parameter<br>
+        13 Appendix 1: Standard Parameter definition<br>
+        14 Appendix 2: List of actuator types and their use of Main Parameter and Functional Parameters<br>
+      </ul>
+      <br>
+      Examples:
+      <ul>
+        <code>set Velux_1 raw MP=51200</code><br>
+        <code>set Velux_2 raw MP=0 FP1=51200</code><br>
+        <code>set Velux_3 raw ParameterActive=3 FP3=25600 FP2=51200</code><br>
+      </ul>
+    </li>
     <a name="limitationMin"></a>
     <li>
       <code>set &lt;name&gt; limitationMin &lt;0 - 100&gt;</code><br>
@@ -1261,6 +1324,27 @@ sub KLF200Node_GW_SET_LIMITATION_REQ($$$$) {
         <code>set Velux_2 limitationUpdateInterval off</code><br>
         <code>set Velux_3 limitationUpdateInterval onChange</code><br>
       </ul>
+    </li>
+    <a name="updateLimitation"></a>
+    <li>
+      <code>set &lt;name&gt; updateLimitation</code><br>
+      <br>
+      Refresh the readings limitationMin and limitationMax from the device.<br>
+      <br>
+    </li>
+    <a name="updateStatus"></a>
+    <li>
+      <code>set &lt;name&gt; updateStatus</code><br>
+      <br>
+      Refresh the status readings and the Main Parameter (MP) from the device.<br>
+      <br>
+    </li>
+    <a name="updateCurrentPosition"></a>
+    <li>
+      <code>set &lt;name&gt; updateCurrentPosition</code><br>
+      <br>
+      Refresh the value of the Main Parameter (MP) and the used Functional Parameters (FP1 - FP7) from the device.<br>
+      <br>
     </li>
   </ul><br>
   <a name="KLF200Nodeattr"></a>
