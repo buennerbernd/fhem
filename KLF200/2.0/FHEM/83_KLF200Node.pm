@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 53683 2019-14-11 15:41:24Z buennerbernd $
+# $Id: 83_KLF200Node.pm 53789 2019-17-12 08:03:35Z buennerbernd $
 #
 ##############################################################################
 
@@ -189,6 +189,7 @@ sub KLF200Node_InitTexts($) {
     5 => "SSL",
   };
   $hash->{".Const"}->{ProductCode}->{1}->{0x00C0} = {
+    3 => "MML",
     6 => "MSL",
   };
   $hash->{".Const"}->{ProductCode}->{1}->{0x0101} = {
@@ -1344,6 +1345,7 @@ sub KLF200Node_GW_SET_LIMITATION_REQ($$$$) {
       <code>set &lt;name&gt; updateCurrentPosition</code><br>
       <br>
       Refresh the value of the Main Parameter (MP) and the used Functional Parameters (FP1 - FP7) from the device.<br>
+      If you are not using the Functional Parameters (FP1 - FP7) prefer set updateStatus.
       <br>
     </li>
   </ul><br>
