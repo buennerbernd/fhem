@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 53789 2019-17-12 08:03:35Z buennerbernd $
+# $Id: 83_KLF200Node.pm 53986 2019-20-12 10:17:47Z buennerbernd $
 #
 ##############################################################################
 
@@ -565,6 +565,10 @@ sub KLF200Node_BulkUpdateMain($$$$$) {
   my ($hash, $rawMP, $rawTarget, $remaining, $state) = @_;
   my $name = $hash->{NAME};
   my $OperatingState = KLF200Node_GetText($hash, "OperatingState", $state);
+  if ($OperatingState eq $state) { #Unknown state
+    $state = $state & 0x07; #keep last 3 bits and try again
+    $OperatingState = KLF200Node_GetText($hash, "OperatingState", $state);
+  }
   Log3($hash, 5, "KLF200Node ($name) BulkUpdateMain MP:$rawMP T:$rawTarget R:$remaining $OperatingState");
   my $changed = KLF200Node_BulkUpdateStatePct($hash, $rawMP);
   KLF200Node_BulkUpdateTarget($hash, $rawTarget);
@@ -1011,8 +1015,6 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
     readingsBulkUpdateIfChanged($hash, "lastMasterExecutionAddress", $LastMasterExecutionAddress, 1);
     readingsBulkUpdateIfChanged($hash, "lastCommandOriginator", $LastCommandOriginatorStr, 1);
     readingsBulkUpdateIfChanged($hash, "lastControl", $LastControl, 1);
-    # Info to KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF: GW_STATUS_REQUEST_REQ isn't necessary 
-    $hash->{".UpdateStatus"} = "IF EXECUTING";
   }
   else {
     my $StatusCount = unpack("C", substr($bytes, 9, 1));
@@ -1031,6 +1033,8 @@ sub KLF200Node_GW_STATUS_REQUEST_NTF($$) {
     }
   }
   readingsEndUpdate($hash, 1);
+  # Info to KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF: GW_STATUS_REQUEST_REQ only if currently executing 
+  $hash->{".UpdateStatus"} = "IF EXECUTING";
   if (defined($statusReplyChanged) and ($StatusReply >= 0xE0) and ($StatusReply <= 0xEE)) {
     $hash->{".UpdateLimitation"} = "YES";
   }
