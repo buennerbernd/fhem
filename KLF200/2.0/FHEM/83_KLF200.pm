@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 35337 2019-20-12 10:17:47Z buennerbernd $
+# $Id: 83_KLF200.pm 35465 2020-11-03 20:21:27Z buennerbernd $
 #
 ##############################################################################
 
@@ -333,6 +333,10 @@ sub KLF200_Write($$) {
   my $name = $hash->{NAME};
 
   my $queue = $hash->{".queue"};
+  if (grep { $_ eq $bytes } @$queue) {
+    Log3 ($name, 1, "KLF200 ($name) Command skipped, already in queue");
+    return;
+  }
   push (@$queue, $bytes);
   readingsSingleUpdate($hash, "queueSize", scalar(@$queue), 1);
   if (scalar(@$queue) == 1) {

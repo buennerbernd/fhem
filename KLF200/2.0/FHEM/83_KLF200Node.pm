@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 53986 2019-20-12 10:17:47Z buennerbernd $
+# $Id: 83_KLF200Node.pm 55844 2020-11-03 20:21:27Z buennerbernd $
 #
 ##############################################################################
 
@@ -315,6 +315,10 @@ sub KLF200Node_Set($$$) {
   if ($cmd eq "updateStatus") {
     return KLF200Node_UpdateStatus($hash);
   }
+  if ($cmd eq "statusUpdateInterval") {
+    my $interval = shift @a; 
+    return KLF200Node_SetStatusUpdateInterval($hash, $interval);
+  }
   if ($cmd eq "updateCurrentPosition") {
     return KLF200Node_UpdateCurrentPosition($hash);
   }
@@ -353,6 +357,7 @@ sub KLF200Node_Set($$$) {
   $usage .= " raw" ;
 #  $usage .= " statusRequest:Main_info,Target_position,Current_position,Remaining_time" ;
   $usage .= " updateStatus:noArg" ;
+  $usage .= " statusUpdateInterval" ;  
   $usage .= " updateCurrentPosition:noArg" ;
   $usage .= " updateLimitation:noArg" ;
   $usage .= " limitationClear:noArg" ;
@@ -496,6 +501,16 @@ sub KLF200Node_SetLimitationUpdateInterval($$) {
   if (not defined($interval) or (not $interval =~ /^(off|onChange|\d+)$/)) {$interval = "off"};
   readingsSingleUpdate($hash, "limitationUpdateInterval", $interval, 1);
   KLF200Node_UpdateLimitation($hash);
+}
+
+sub KLF200Node_SetStatusUpdateInterval($$) {
+  my ($hash, $interval) = @_;
+  my $name = $hash->{NAME};
+  
+  Log3($name, 5, "KLF200Node ($name) - set statusUpdateInterval $interval");
+  if (not defined($interval) or (not $interval =~ /^(default|\d+)$/)) {$interval = "default"};
+  readingsSingleUpdate($hash, "statusUpdateInterval", $interval, 1);
+  KLF200Node_UpdateStatus($hash);
 }
 
 sub KLF200Node_ToggleCmd($) {
@@ -758,8 +773,8 @@ sub KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($$) {
 
   my $name = $hash->{NAME};
   Log3($hash, 5, "KLF200Node ($name) GW_NODE_STATE_POSITION_CHANGED_NTF $commandHex $NodeID $State MP:$CurrentPosition T:$Target FP1:$FP1CurrentPosition $RemainingTime $TimeStamp");
+
   RemoveInternalTimer($hash, "KLF200Node_UpdateStatus");
-  if ( $State == 44 ) { return $name; } #Ignore this event
   readingsBeginUpdate($hash);
   my ($changed, $targetArrival) = KLF200Node_BulkUpdateMain($hash, $CurrentPosition, $Target, $RemainingTime, $State);
   KLF200Node_BulkUpdateFP($hash, 1, $FP1CurrentPosition);
@@ -767,15 +782,17 @@ sub KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($$) {
   KLF200Node_BulkUpdateFP($hash, 3, $FP3CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 4, $FP4CurrentPosition);
   readingsEndUpdate($hash, 1);
+  my $statusUpdateInterval = ReadingsVal($name, "statusUpdateInterval", "default");
   if ((ReadingsVal($name, "lastRunStatus", "") ne "EXECUTION ACTIVE")) {
     #Otherwhise it could destroy a running session
     my $updateLimitation = delete($hash->{".UpdateLimitation"});
     my $updateStatus = delete($hash->{".UpdateStatus"});
     if(defined($changed) or defined($targetArrival) or (defined($updateStatus) and ($updateStatus eq "YES"))) {
       $updateStatus = "YES" if (not defined($updateStatus));
-      $updateStatus = "YES" if (($updateStatus eq "IF EXECUTING") and $State == 4 );
+      $updateStatus = "YES" if (($updateStatus eq "IF EXECUTING") and ( ReadingsVal($name, "operatingState", "Done") eq "Executing" ) );
       Log3($hash, 5, "KLF200Node ($name) GW_NODE_STATE_POSITION_CHANGED_NTF updateStatus $updateStatus");
       if ($updateStatus eq "YES") {
+        $statusUpdateInterval = "default";
         if(defined($targetArrival)) {
           Log3($hash, 5, "KLF200Node ($name) GW_NODE_STATE_POSITION_CHANGED_NTF targetArrival $targetArrival");
           InternalTimer( $targetArrival, "KLF200Node_UpdateStatus", $hash);
@@ -784,6 +801,9 @@ sub KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($$) {
           KLF200Node_UpdateStatus($hash);
         }
       }
+    }
+    if ($statusUpdateInterval =~ /^\d+$/) {
+      InternalTimer( gettimeofday() + $statusUpdateInterval, "KLF200Node_UpdateStatus", $hash);
     }
     if (defined($updateLimitation) or defined($changed)) {
       KLF200Node_UpdateLimitation($hash);  
@@ -1343,6 +1363,25 @@ sub KLF200Node_GW_SET_LIMITATION_REQ($$$$) {
       <br>
       Refresh the status readings and the Main Parameter (MP) from the device.<br>
       <br>
+    </li>
+    <a name="statusUpdateInterval"></a>
+    <li>
+      <code>set &lt;name&gt; statusUpdateInterval default|&lt;s&gt;</code><br>
+      <br>
+      Defines how often to update the status from the device.<br>
+      default: By default the KLF 200 box decides how often the status of a device is pushed to FHEM depending on the node type.
+      If the device was moved by the KLF 200 box then FHEM gets the feedback immediately.
+      If the device mas moved by an external remote control then FHEM gets the feedback in a few minutes (in general less than 15 minutes).<br>
+      interval in s: If the default behavior is not good enough for you, define an update interval.
+      This means if the default behavior waits longer than the interval then an update is forced by poll.
+      Proposal: 600, not below 120.<br>
+      Default is default.
+      <br>
+      Examples:
+      <ul>
+        <code>set Velux_1 statusUpdateInterval 600</code><br>
+        <code>set Velux_2 statusUpdateInterval default</code><br>
+      </ul>
     </li>
     <a name="updateCurrentPosition"></a>
     <li>
