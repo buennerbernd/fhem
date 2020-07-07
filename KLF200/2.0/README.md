@@ -30,6 +30,8 @@ IO-homecontrol devices with positive feedback by users of the KLF200 modules:
   * Somfy Oximo io
   * Somfy RS100 io
   * Somfy Izymo io
+* Dual Roller Shutter
+  * VELUX SMG
 * Vertical Interior Blinds:
   * VELUX FSK
   * VELUX DML
@@ -43,6 +45,8 @@ IO-homecontrol devices with positive feedback by users of the KLF200 modules:
 * Vertical Exterior Awning
   * VELUX MSL
   * VELUX MML
+* Light only supporting on/off
+  * Somfy
 
 Load the modules into FHEM:
 
