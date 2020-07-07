@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 55844 2020-11-03 20:21:27Z buennerbernd $
+# $Id: 83_KLF200Node.pm 56310 2020-07-07 19:41:26Z buennerbernd $
 #
 ##############################################################################
 
@@ -202,6 +202,9 @@ sub KLF200Node_InitTexts($) {
     5 => "FSK",
     6 => "DML",
   };
+  $hash->{".Const"}->{ProductCode}->{1}->{0x0340} = {
+    4 => "SMG",
+  };
   $hash->{".Const"}->{StatusID} = {
     0x01 => "USER",
     0x02 => "RAIN",
@@ -352,6 +355,8 @@ sub KLF200Node_Set($$$) {
   }
   
   my $usage= " on:noArg off:noArg toggle:noArg up:noArg down:noArg stop:noArg" ;
+  $usage .= " my:noArg" if (ReadingsVal($name, "ioManufacturer", "") eq "Somfy");
+  $usage .= " SecuredVentilation:noArg" if (ReadingsVal($name, "nodeTypeSubType", "") =~ /^Window opener/ );
   $usage .= " pct:slider,0,1,100" ;
   $usage .= " execution:up,down,stop" ;
   $usage .= " raw" ;
@@ -409,13 +414,15 @@ sub KLF200Node_SetState($$$) {
   my $name = $hash->{NAME};
   Log3($name, 5, "KLF200Node ($name) - set $state");
   my $MP;
-  if    ($state eq "stop")   { $MP = 0xD200 }
-  elsif ($state eq "up")     { $MP = 0x0000 }
-  elsif ($state eq "down")   { $MP = 0xC800 }
-  elsif ($state eq "target") { $MP = 0xD100 }
-  elsif ($state eq "on")     { $MP = KLF200Node_PctToRaw($hash, 100) }
-  elsif ($state eq "off")    { $MP = KLF200Node_PctToRaw($hash, 0) }
-  else                       { $MP = KLF200Node_PctToRaw($hash, $state) }
+  if    ($state eq "stop")               { $MP = 0xD200 }
+  elsif ($state eq "up")                 { $MP = 0x0000 }
+  elsif ($state eq "down")               { $MP = 0xC800 }
+  elsif ($state eq "target")             { $MP = 0xD100 }
+  elsif ($state eq "my")                 { $MP = 0xD800 }
+  elsif ($state eq "SecuredVentilation") { $MP = 0xD803 }
+  elsif ($state eq "on")                 { $MP = KLF200Node_PctToRaw($hash, 100) }
+  elsif ($state eq "off")                { $MP = KLF200Node_PctToRaw($hash, 0) }
+  else                                   { $MP = KLF200Node_PctToRaw($hash, $state) }
 
   if(not defined($velocity)) { $velocity = AttrVal($name, "velocity", "DEFAULT") }
   $hash->{"VelocitySet"} = $velocity;
