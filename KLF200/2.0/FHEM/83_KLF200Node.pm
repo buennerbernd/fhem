@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 56310 2020-07-07 19:41:26Z buennerbernd $
+# $Id: 83_KLF200Node.pm 56332 2020-09-07 07:05:12Z buennerbernd $
 #
 ##############################################################################
 
@@ -297,7 +297,7 @@ sub KLF200Node_Set($$$) {
     my $velocity = shift @a;
     return KLF200Node_SetState($hash, $value, $velocity);
   }
-  if ($cmd =~ /^([0-9]+|on|off|up|down|stop)$/) {
+  if ($cmd =~ /^([0-9]+|on|off|up|down|stop|my|securedVentilation)$/) {
     my $velocity = shift @a;
     return KLF200Node_SetState($hash, $cmd, $velocity);
   }
@@ -356,7 +356,7 @@ sub KLF200Node_Set($$$) {
   
   my $usage= " on:noArg off:noArg toggle:noArg up:noArg down:noArg stop:noArg" ;
   $usage .= " my:noArg" if (ReadingsVal($name, "ioManufacturer", "") eq "Somfy");
-  $usage .= " SecuredVentilation:noArg" if (ReadingsVal($name, "nodeTypeSubType", "") =~ /^Window opener/ );
+  $usage .= " securedVentilation:noArg" if (ReadingsVal($name, "nodeTypeSubType", "") =~ /^Window opener/ );
   $usage .= " pct:slider,0,1,100" ;
   $usage .= " execution:up,down,stop" ;
   $usage .= " raw" ;
@@ -419,7 +419,7 @@ sub KLF200Node_SetState($$$) {
   elsif ($state eq "down")               { $MP = 0xC800 }
   elsif ($state eq "target")             { $MP = 0xD100 }
   elsif ($state eq "my")                 { $MP = 0xD800 }
-  elsif ($state eq "SecuredVentilation") { $MP = 0xD803 }
+  elsif ($state eq "securedVentilation") { $MP = 0xD803 }
   elsif ($state eq "on")                 { $MP = KLF200Node_PctToRaw($hash, 100) }
   elsif ($state eq "off")                { $MP = KLF200Node_PctToRaw($hash, 0) }
   else                                   { $MP = KLF200Node_PctToRaw($hash, $state) }
