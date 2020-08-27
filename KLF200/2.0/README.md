@@ -39,6 +39,7 @@ IO-homecontrol devices with positive feedback by users of the KLF200 modules:
   * VELUX KMG
   * VELUX CVP
   * VELUX KSX
+  * VELUX GPU
 * Horizontal awning:
   * Somfy Sunea io
   * Somfy Maestria+ 50 io
