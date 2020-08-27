@@ -45,6 +45,8 @@ IO-homecontrol devices with positive feedback by users of the KLF200 modules:
 * Vertical Exterior Awning
   * VELUX MSL
   * VELUX MML
+* Exterior Venetian blind
+  * Somfy
 * Light only supporting on/off
   * Somfy
 
