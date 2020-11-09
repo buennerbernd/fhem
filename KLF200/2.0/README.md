@@ -35,6 +35,7 @@ IO-homecontrol devices with positive feedback by users of the KLF200 modules:
 * Vertical Interior Blinds:
   * VELUX FSK
   * VELUX DML
+  * VELUX RSL
 * Window opener with integrated rain sensor:
   * VELUX KMG
   * VELUX CVP
