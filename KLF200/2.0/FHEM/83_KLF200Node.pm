@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 56332 2020-09-07 07:05:12Z buennerbernd $
+# $Id: 83_KLF200Node.pm 56402 2020-09-11 07:52:49Z buennerbernd $
 #
 ##############################################################################
 
@@ -197,10 +197,12 @@ sub KLF200Node_InitTexts($) {
     2 => "KMG",
     3 => "CVP",
     7 => "KSX",
+    12 => "GPU",
   };
   $hash->{".Const"}->{ProductCode}->{1}->{0x0280} = {
     5 => "FSK",
     6 => "DML",
+    7 => "RSL",
   };
   $hash->{".Const"}->{ProductCode}->{1}->{0x0340} = {
     4 => "SMG",
@@ -458,7 +460,7 @@ sub KLF200Node_SetLimitation($$$) {
   if (not defined($minPct) and not defined($maxPct)) {    
     Log3($name, 5, "KLF200Node ($name) - set limitationClear");
     readingsSingleUpdate($hash, ".limitationMin", 0, 1);
-    return KLF200Node_GW_SET_LIMITATION_REQ($hash, 0xD400, 0xD400, 255);
+    return KLF200Node_GW_SET_LIMITATION_REQ($hash, 0xD400, 0xD400, 255); # 255 = clear all 
   }
   my $pctCurrent = ReadingsVal($name, "pct", 0);
   my $pctNew = undef;
@@ -495,7 +497,7 @@ sub KLF200Node_SetLimitation($$$) {
       $maxRaw = KLF200Node_PctToRaw($hash, $maxPct);
     }
   }
-  my $result =  KLF200Node_GW_SET_LIMITATION_REQ($hash, $minRaw, $maxRaw, 253);
+  my $result =  KLF200Node_GW_SET_LIMITATION_REQ($hash, $minRaw, $maxRaw, 253); # 253 = unlimited
   if (defined($pctNew)) { KLF200Node_SetState($hash, $pctNew, undef) };
   return $result;
 }
