@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 35465 2020-09-11 07:52:49Z buennerbernd $
+# $Id: 83_KLF200.pm 35653 2021-06-08 07:24:55Z buennerbernd $
 #
 ##############################################################################
 
@@ -17,13 +17,14 @@ use DevIo; # load DevIo.pm if not already loaded
 sub KLF200_Initialize($) {
   my ($hash) = @_;
 
-  $hash->{DefFn}    = "KLF200_Define";
-  $hash->{UndefFn}  = "KLF200_Undef";
-  $hash->{SetFn}    = "KLF200_Set";
-  $hash->{ReadFn}   = "KLF200_Read";
-  $hash->{ReadyFn}  = "KLF200_Ready";
-  $hash->{WriteFn}  = "KLF200_Write";
-  $hash->{AttrList} = "autoReboot:0,1 velocity:DEFAULT,SILENT,FAST controlNames " . $readingFnAttributes;
+  $hash->{DefFn}      = "KLF200_Define";
+  $hash->{UndefFn}    = "KLF200_Undef";
+  $hash->{SetFn}      = "KLF200_Set";
+  $hash->{ReadFn}     = "KLF200_Read";
+  $hash->{ShutdownFn} = "KLF200_Shutdown";
+  $hash->{ReadyFn}    = "KLF200_Ready";
+  $hash->{WriteFn}    = "KLF200_Write";
+  $hash->{AttrList}   = "autoReboot:0,1 velocity:DEFAULT,SILENT,FAST controlNames " . $readingFnAttributes;
   
   $hash->{parseParams}  = 1;
   $hash->{Clients} = "KLF200Node.*";
@@ -63,6 +64,14 @@ sub KLF200_Define($$) {
   KLF200_InitTexts($hash);
  
   return undef;
+}
+
+sub KLF200_Shutdown($) {
+	my ($hash) = @_;
+
+	# close the connection
+	DevIo_CloseDev($hash);
+	return undef;
 }
 
 sub KLF200_InitTexts($) {
@@ -145,13 +154,13 @@ sub KLF200_GetId($$$$) {
 
 
 # called when definition is undefined 
-# (config reload, shutdown or delete of definition)
+# (config reload or delete of definition)
 sub KLF200_Undef($$) {
   my ($hash, $name) = @_;
  
   # close the connection 
   DevIo_CloseDev($hash);
-  
+  RemoveInternalTimer($hash);    
   return undef;
 }
 
