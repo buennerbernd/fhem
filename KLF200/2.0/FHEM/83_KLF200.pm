@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 35653 2021-06-08 07:24:55Z buennerbernd $
+# $Id: 83_KLF200.pm 35678 2021-08-09 10:42:01Z buennerbernd $
 #
 ##############################################################################
 
@@ -70,7 +70,7 @@ sub KLF200_Shutdown($) {
 	my ($hash) = @_;
 
 	# close the connection
-	DevIo_CloseDev($hash);
+	DevIo_CloseDev($hash) if(DevIo_IsOpen($hash)); 
 	return undef;
 }
 
