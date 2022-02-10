@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 35678 2021-08-09 10:42:01Z buennerbernd $
+# $Id: 83_KLF200.pm 36090 2022-10-02 09:30:54Z buennerbernd $
 #
 ##############################################################################
 
@@ -24,7 +24,7 @@ sub KLF200_Initialize($) {
   $hash->{ShutdownFn} = "KLF200_Shutdown";
   $hash->{ReadyFn}    = "KLF200_Ready";
   $hash->{WriteFn}    = "KLF200_Write";
-  $hash->{AttrList}   = "autoReboot:0,1 velocity:DEFAULT,SILENT,FAST controlNames " . $readingFnAttributes;
+  $hash->{AttrList}   = "autoReboot:0,1 velocity:DEFAULT,SILENT,FAST controlNames priorityLevel:5,3,2 " . $readingFnAttributes;
   
   $hash->{parseParams}  = 1;
   $hash->{Clients} = "KLF200Node.*";
@@ -830,7 +830,7 @@ sub KLF200_GW_ACTIVATE_SCENE_REQ($$$) {
   my $SessionID = KLF200_getNextSessionID($hash);
   my $SessionIDShort = pack("n", $SessionID);
   my $CommandOriginator = "\x08"; #SAAC Stand Alone Automatic Controls 
-  my $PriorityLevel = "\05"; #Comfort Level 2 Used by Stand Alone Automatic Controls 
+  my $PriorityLevel = pack("C", AttrVal($name, "priorityLevel", 5)); #Default = 5 = Comfort Level 2 Used by Stand Alone Automatic Controls 
   my $SceneIDByte = pack("C", $SceneID);
   my $VelocityByte = pack("C", $VelocityId);
   
@@ -1061,6 +1061,13 @@ sub KLF200_GW_ERROR_NTF($$) {
         Values can be 0 for off and 1 for on, default is on.<br>
         Reboot the KLF200 box if connection was lost. Reason: The KLF200 box supports only two TCP sockets.
         If the connection was broken a socket is unusable in most cases. So a reboot ensures that always a second socket is available.<br>
+        <br>
+    </li>
+    <a name="prorityLevel"></a>
+    <li>prorityLevel<br>
+        The priority of the scene commands send by FHEM.<br>
+        The default value is 5. Do not change this unless you have problems and see the reading <code>lastStatusReply: PRIORITY LEVEL LOCKED</code>.<br>
+        Try 3 and only if this fails 2.<br>
         <br>
     </li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>

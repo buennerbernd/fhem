@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 56478 2021-08-09 10:42:01Z buennerbernd $
+# $Id: 83_KLF200Node.pm 56937 2022-10-02 09:30:54Z buennerbernd $
 #
 ##############################################################################
 
@@ -22,7 +22,7 @@ sub KLF200Node_Initialize($) {
   $hash->{ReadFn}     = 'KLF200Node_Read';
   $hash->{ParseFn}    = 'KLF200Node_Parse';
   
-  $hash->{AttrList}   = "directionOn:up,down velocity:DEFAULT,SILENT,FAST " . $readingFnAttributes;
+  $hash->{AttrList}   = "directionOn:up,down velocity:DEFAULT,SILENT,FAST priorityLevel:5,3,2 " . $readingFnAttributes;
   $hash->{parseParams}  = 1;
   $hash->{Match}      = ".*";
 
@@ -964,8 +964,8 @@ sub KLF200Node_GW_COMMAND_SEND_REQ($$$) {
   my $Command = "\x03\x00";
   my $SessionID = KLF200Node_getNextSessionID($hash);
   my $SessionIDShort = pack("n", $SessionID);
-  my $CommandOriginator = "\x08"; #SAAC Stand Alone Automatic Controls 
-  my $PriorityLevel = "\05"; #Comfort Level 2 Used by Stand Alone Automatic Controls 
+  my $CommandOriginator = "\x08"; #SAAC Stand Alone Automatic Controls
+  my $PriorityLevel = pack("C", AttrVal($name, "priorityLevel", 5)); #Default = 5 = Comfort Level 2 Used by Stand Alone Automatic Controls 
   my $ParameterActiveByte = pack("C", $ParameterActive);
   
   my $FPI1FPI2 = 0;
@@ -1133,7 +1133,7 @@ sub KLF200Node_GW_SET_LIMITATION_REQ($$$$) {
   Log3($hash, 5, "KLF200Node ($name) KLF200Node_GW_SET_LIMITATION_REQ SessionID $SessionID min:$valueMin max:$valueMax $limitationTime");
   my $SessionIDShort = pack("n", $SessionID);
   my $CommandOriginator = "\x08"; #SAAC Stand Alone Automatic Controls 
-  my $PriorityLevel = "\05"; #Comfort Level 2 Used by Stand Alone Automatic Controls 
+  my $PriorityLevel = pack("C", AttrVal($name, "priorityLevel", 5)); #Default = 5 = Comfort Level 2 Used by Stand Alone Automatic Controls 
   my $IndexArrayCount = pack("C", 1);
   my $IndexArray = pack("Cx19", $NodeId);
   my $ParameterID = "\x00";
@@ -1417,6 +1417,13 @@ sub KLF200Node_GW_SET_LIMITATION_REQ($$$$) {
         Defines the meaning of <code>on</code> and 100%.
         Values can be <code>up</code> and <code>down</code>. By default the direction of <code>on</code> is mapped to <code>up</code>.<br>
         The best value might depend on the device type and personal preferences.<br>
+        <br>
+    </li>
+    <a name="prorityLevel"></a>
+    <li>prorityLevel<br>
+        The priority of the commands send by FHEM.<br>
+        The default value is 5. Do not change this unless you have problems and see the reading <code>lastStatusReply: PRIORITY LEVEL LOCKED</code>.<br>
+        Try 3 and only if this fails 2.<br>
         <br>
     </li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
