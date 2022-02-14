@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 36090 2022-10-02 09:30:54Z buennerbernd $
+# $Id: 83_KLF200.pm 36744 2022-14-02 12:06:46Z buennerbernd $
 #
 ##############################################################################
 
@@ -48,7 +48,8 @@ sub KLF200_Define($$) {
   $hash->{Host} = $host;
   $hash->{DeviceName} = $host.':51200';
   $hash->{SSL} = 1;
-  $hash->{TIMEOUT} = 10; #default is 3 
+  $hash->{TIMEOUT} = 10; 		#default is 3
+  $hash->{nextOpenDelay} = 30;  #default is 60
   
   $hash->{".sceneUsage"} = "";
   $hash->{".sceneIDUsage"} = "";
@@ -68,9 +69,15 @@ sub KLF200_Define($$) {
 
 sub KLF200_Shutdown($) {
 	my ($hash) = @_;
+	my $name = $hash->{NAME};
 
-	# close the connection
-	DevIo_CloseDev($hash) if(DevIo_IsOpen($hash)); 
+	if(DevIo_IsOpen($hash)) {
+	  # leave the box in a healthy state
+	  KLF200_GW_REBOOT_REQ($hash, 0) if(AttrVal($name, "autoReboot", 1) == 1);
+	  # close the connection 
+	  DevIo_CloseDev($hash);
+	}
+	RemoveInternalTimer($hash);    
 	return undef;
 }
 
@@ -158,10 +165,8 @@ sub KLF200_GetId($$$$) {
 sub KLF200_Undef($$) {
   my ($hash, $name) = @_;
  
-  # close the connection 
-  DevIo_CloseDev($hash);
-  RemoveInternalTimer($hash);    
-  return undef;
+  # same as shutdown
+  return KLF200_Shutdown($hash);
 }
 
 # called repeatedly if device disappeared
@@ -233,12 +238,13 @@ sub KLF200_Set($$$) {
   elsif ($cmd eq "login")          { KLF200_login($hash, $arg1) }
   elsif ($cmd eq "updateNodes")    { KLF200_GW_GET_ALL_NODES_INFORMATION_REQ($hash) }
   elsif ($cmd eq "updateAll")      { KLF200_UpdateAll($hash) }
-  elsif ($cmd eq "reboot")         { KLF200_GW_REBOOT_REQ($hash) }
+  elsif ($cmd eq "reboot")         { KLF200_GW_REBOOT_REQ($hash, 0) }
   elsif ($cmd eq "clearLastError") { readingsSingleUpdate($hash, "lastError", "", 1); return undef }   
+  elsif ($cmd eq "clearQueue") 	   { KLF200_ClearQueue($hash) }   
   else {
       my $sceneUsage = $hash->{".sceneUsage"};
       my $sceneIDUsage = $hash->{".sceneIDUsage"};
-      my $usage = "unknown argument $cmd, choose one of scene:$sceneUsage sceneID:$sceneIDUsage login updateNodes:noArg updateAll:noArg reboot:noArg clearLastError:noArg";
+      my $usage = "unknown argument $cmd, choose one of scene:$sceneUsage sceneID:$sceneIDUsage login updateNodes:noArg updateAll:noArg reboot:noArg clearLastError:noArg  clearQueue:noArg";
       return $usage;
   }
 }
@@ -397,6 +403,17 @@ sub KLF200_RunQueue($) {
   if (scalar(@$queue) > 0) {
     KLF200_WriteDirect($hash, @$queue[0]);
   }
+}
+
+sub KLF200_ClearQueue($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $queue = $hash->{".queue"};
+  
+  @$queue = ();
+  Log3 ($name, 3, "KLF200 ($name) Queue cleared");
+  readingsSingleUpdate($hash, "queueSize", scalar(@$queue), 1);
+  return;
 }
 
 sub KLF200_DispatchToNode($$) {
@@ -574,7 +591,7 @@ sub KLF200_GW_PASSWORD_ENTER_CFM($$) {
     readingsSingleUpdate($hash, "state", "Log in failed", 1);
     return;
   }
-  my $connectionsAfterBoot = ReadingsVal($name, "connectionsAfterBoot", 0) + 1;
+  my $connectionsAfterBoot = ReadingsVal($name, "connectionsAfterBoot", 0) + 1; #This reading survives a FHEM restart, so it is > 0 in this case
   
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "connectionsAfterBoot", $connectionsAfterBoot, 1);
@@ -585,7 +602,7 @@ sub KLF200_GW_PASSWORD_ENTER_CFM($$) {
   KLF200_RunQueue($hash);
   if (($connectionsAfterBoot > 1) and (AttrVal($name, "autoReboot", 1) == 1)) {
     #After successful login: try to reboot box if this is not the first connection
-    KLF200_GW_REBOOT_REQ($hash);
+    KLF200_GW_REBOOT_REQ($hash, 1);
     return;
   }
   #After successful login: set the time of KLF200 box
@@ -889,14 +906,15 @@ sub KLF200_GW_COMMAND_SEND_CFM($$) {
   return;  
 }
 
-sub KLF200_GW_REBOOT_REQ($) {
-  my ($hash) = @_;
+sub KLF200_GW_REBOOT_REQ($$) {
+  my ($hash, $queued) = @_;
   my $name = $hash->{NAME};
   
   my $Command = "\x00\x01";
   
   Log3($hash, 5, "KLF200 ($name) GW_REBOOT_REQ");
-  KLF200_Write($hash, $Command);
+  if($queued) { KLF200_Write($hash, $Command); }
+  else 		  { KLF200_WriteDirect($hash, $Command); };
   return;
 } 
 
@@ -912,7 +930,7 @@ sub KLF200_GW_REBOOT_CFM($$) {
   readingsBulkUpdate($hash, "state", "Reboot", 1);
   readingsBulkUpdate($hash, "connectionsAfterBoot", 0, 1);
   readingsEndUpdate($hash, 1);
-  Log3($name, 1, "KLF200 ($name) - connectionBroken -> reboot started, reconnect in 30 seconds");
+  Log3($name, 1, "KLF200 ($name) - reboot started, reconnect in 30 seconds");
   
   KLF200_Dequeue($hash, qr/^\x00\x01/, undef); #GW_REBOOT_REQ
   return;  
