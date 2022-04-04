@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 36744 2022-14-02 12:06:46Z buennerbernd $
+# $Id: 83_KLF200.pm 36744 2022-04-04 08:22:41Z buennerbernd $
 #
 ##############################################################################
 
@@ -328,8 +328,8 @@ sub KLF200_UnwrapBytes($$) {
     return undef;
   }
   $bytes = substr($bytes, 2, length($bytes) - 3); #remove SLIP_END and ProtocolID
-  $bytes =~ s/\xDB\xDD/\xDB/g;        #replace SLIP_ESC SLIP_ESC_ESC by SLIP_ESC
   $bytes =~ s/\xDB\xDC/\xC0/g;        #replace SLIP_ESC SLIP_ESC_END by SLIP_END
+  $bytes =~ s/\xDB\xDD/\xDB/g;        #replace SLIP_ESC SLIP_ESC_ESC by SLIP_ESC
   
   $bytes = substr($bytes, 0, length($bytes) - 1); #cut CRC
   my $expLength = unpack('C', substr($bytes, 0, 1));

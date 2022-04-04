@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 56937 2022-14-02 12:06:46Z buennerbernd $
+# $Id: 83_KLF200Node.pm 57253 2022-04-04 08:22:41Z buennerbernd $
 #
 ##############################################################################
 
@@ -1005,11 +1005,22 @@ sub KLF200Node_GW_STATUS_REQUEST_REQ($$) {
   my $IndexArrayCount = pack("C", 1);
   my $IndexArray = pack("Cx19", $NodeId);
   my $StatusTypeByte = pack("C", $StatusTypeId);
-  my $FPI1FPI2 = "\x00\x00";
+  my $FPI1FPI2 = 0x0000;
   if ($StatusTypeId != 3) {
-    $FPI1FPI2 = "\xFE\x00"; #request FP1 - FP7
+      $FPI1FPI2 = 0xFFFF;
+      my $flags = 16;
+      my $i = 16;
+      #Only 7 FP flags are allowed, remove 9
+      while ( $flags > 7 and $i > 0 ) {
+        if( not defined(ReadingsVal($name, "FP".$i, undef)) ) {
+          $FPI1FPI2 = $FPI1FPI2 ^ (0x10000 >> $i);
+          $flags--;
+        }
+        $i--;
+      }
   }
-  my $bytes = $Command.$SessionIDShort.$IndexArrayCount.$IndexArray.$StatusTypeByte.$FPI1FPI2;
+  my $FPI1FPI2Short = pack("n", $FPI1FPI2);
+  my $bytes = $Command.$SessionIDShort.$IndexArrayCount.$IndexArray.$StatusTypeByte.$FPI1FPI2Short;
   return IOWrite($hash, $bytes);
 }
 
