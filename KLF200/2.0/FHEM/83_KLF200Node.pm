@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 57253 2022-04-04 08:22:41Z buennerbernd $
+# $Id: 83_KLF200Node.pm 57347 2022-21-06 06:47:59Z buennerbernd $
 #
 ##############################################################################
 
@@ -894,7 +894,7 @@ sub KLF200Node_GW_CS_GET_SYSTEMTABLE_DATA_NTF($$) {
   
   my ($commandHex, $NumberOfEntry) = unpack("H4 C", $bytes);
 
-  my $result;
+  my $result = ""; # No auto create needed
   for (my $i = 0; $i < $NumberOfEntry; $i++) {
     my $offset = 3 + $i * 11;
     my $SystemTableObject = substr($bytes, $offset, 11);
@@ -903,7 +903,7 @@ sub KLF200Node_GW_CS_GET_SYSTEMTABLE_DATA_NTF($$) {
     if ($NodeID < 200) { #Handle only actuators, ignore beacons
       my ($hash, $undefined) = KLF200Node_GetHash($io_hash, $NodeID);
       if (not defined($hash)) {
-        $result = $undefined;
+        $result = $undefined; # auto create needed
       }
       else {
         my $name = $hash->{NAME};
@@ -940,7 +940,7 @@ sub KLF200Node_GW_CS_GET_SYSTEMTABLE_DATA_NTF($$) {
           readingsBulkUpdate($hash, "limitationUpdateInterval", "onChange", 1); #Default value for rain sensor
         }
         readingsEndUpdate($hash, 1);
-        $result = $name if (not defined($result));
+        $result = $name if ($result eq ""); # Keep previous information (could be auto create)
       }
     }
     else {
