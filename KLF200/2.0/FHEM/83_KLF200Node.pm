@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 57556 2022-30-08 11:30:06Z buennerbernd $
+# $Id: 83_KLF200Node.pm 57990 2022-30-08 14:48:37Z buennerbernd $
 #
 ##############################################################################
 
@@ -40,6 +40,14 @@ sub KLF200Node_Define($$) {
   $hash->{DeviceName} = $DeviceName;
   my $NodeID  = $param[3];
   $hash->{NodeID} = $NodeID;
+  
+  my $storedHash = $modules{KLF200Node}{defptr}{$DeviceName}{$NodeID};
+  if(defined($storedHash)) {
+    my $name = $param[0];
+    my $oldName = $storedHash->{NAME};
+    my $oldFUUID = $storedHash->{FUUID};
+    Log3($hash, 1, "KLF200Node ($name) Duplicated device! Please delete $oldName FUUID=$oldFUUID !");
+  }
   
   # Map address backwards to $hash (for ParseFn)
   $modules{KLF200Node}{defptr}{$DeviceName}{$NodeID} = $hash;
@@ -277,7 +285,8 @@ sub KLF200Node_Undef($$) {
   my $name = $hash->{NAME};
   my $NodeID = $hash->{NodeID};
   my $DeviceName = $hash->{DeviceName};
-  delete $modules{KLF200Node}{defptr}{$DeviceName}{$NodeID};
+  my $storedHash = $modules{KLF200Node}{defptr}{$DeviceName}{$NodeID};
+  delete $modules{KLF200Node}{defptr}{$DeviceName}{$NodeID} if(defined($storedHash) and $storedHash==$hash);
   Log3($hash, 3, "KLF200Node ($name) Delete $name $DeviceName $NodeID");
   return undef;
 }
