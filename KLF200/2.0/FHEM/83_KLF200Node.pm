@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 57347 2022-21-06 06:47:59Z buennerbernd $
+# $Id: 83_KLF200Node.pm 57556 2022-30-08 11:30:06Z buennerbernd $
 #
 ##############################################################################
 
@@ -247,7 +247,7 @@ sub KLF200Node_GetText($$$) {
   
   my $text = $hash->{".Const"}->{$const}->{$id};
   if (not defined($text)) {
-    Log3($hash, 3, "KLF200 $name: Unknown $const ID: $id");
+    Log3($hash, 3, "KLF200Node ($name) Unknown $const ID: $id");
     return $id
   };
   
@@ -265,7 +265,7 @@ sub KLF200Node_GetId($$$$) {
   my %textToId = reverse( %$idToText );   
   my $id = $textToId{$text};
   if(not defined($id)) {
-    Log3($hash, 3, "KLF200 $name: Unknown $const text: $text");
+    Log3($hash, 3, "KLF200Node ($name) Unknown $const text: $text");
     return $default
   };
   
@@ -274,9 +274,11 @@ sub KLF200Node_GetId($$$$) {
 
 sub KLF200Node_Undef($$) {
   my ($hash, $arg) = @_; 
+  my $name = $hash->{NAME};
   my $NodeID = $hash->{NodeID};
   my $DeviceName = $hash->{DeviceName};
   delete $modules{KLF200Node}{defptr}{$DeviceName}{$NodeID};
+  Log3($hash, 3, "KLF200Node ($name) Delete $name $DeviceName $NodeID");
   return undef;
 }
 
@@ -385,7 +387,7 @@ sub KLF200Node_UpdateLimitation($;$) {
   if ($limitationUpdateInterval eq "off") { return undef };
   if (ReadingsVal($name, "execution", "stop") ne "stop") {
     #defer if executing
-    Log3($name, 5, "KLF200Node ($name) - UpdateLimitation defer");
+    Log3($hash, 5, "KLF200Node ($name) - UpdateLimitation defer");
     $hash->{".UpdateLimitation"} = "YES";
     return undef;
   }
@@ -414,7 +416,7 @@ sub KLF200Node_UpdateCurrentPosition($) {
 sub KLF200Node_SetState($$$) {
   my ($hash, $state, $velocity) = @_;
   my $name = $hash->{NAME};
-  Log3($name, 5, "KLF200Node ($name) - set $state");
+  Log3($hash, 5, "KLF200Node ($name) - set $state");
   my $MP;
   if    ($state eq "stop")               { $MP = 0xD200 }
   elsif ($state eq "up")                 { $MP = 0x0000 }
@@ -458,7 +460,7 @@ sub KLF200Node_SetLimitation($$$) {
   my $name = $hash->{NAME};
   
   if (not defined($minPct) and not defined($maxPct)) {    
-    Log3($name, 5, "KLF200Node ($name) - set limitationClear");
+    Log3($hash, 5, "KLF200Node ($name) - set limitationClear");
     readingsSingleUpdate($hash, ".limitationMin", 0, 1);
     return KLF200Node_GW_SET_LIMITATION_REQ($hash, 0xD400, 0xD400, 255); # 255 = clear all 
   }
@@ -468,9 +470,9 @@ sub KLF200Node_SetLimitation($$$) {
   my $maxRaw = 0xD400; #ignore
   my $directionOn = AttrVal($name, "directionOn", "up");
   if (defined($minPct)) {
-    Log3($name, 5, "KLF200Node ($name) - set limitationMin $minPct");
+    Log3($hash, 5, "KLF200Node ($name) - set limitationMin $minPct");
     if($minPct > ReadingsVal($name, "limitationMax", 100)) {
-      Log3($name, 1, "KLF200Node ($name) - limitationMin > limitationMax");
+      Log3($hash, 1, "KLF200Node ($name) - limitationMin > limitationMax");
       return "limitationMin > limitationMax";
     }
     if($pctCurrent < $minPct) { $pctNew = $minPct };
@@ -483,9 +485,9 @@ sub KLF200Node_SetLimitation($$$) {
     }
   }
   if (defined($maxPct)) {
-    Log3($name, 5, "KLF200Node ($name) - set limitationMax $maxPct");
+    Log3($hash, 5, "KLF200Node ($name) - set limitationMax $maxPct");
     if($maxPct < ReadingsVal($name, "limitationMin", 0)) {
-      Log3($name, 1, "KLF200Node ($name) - limitationMax < limitationMin");
+      Log3($hash, 1, "KLF200Node ($name) - limitationMax < limitationMin");
       return "limitationMax < limitationMin";
     }
     if($pctCurrent > $maxPct) { $pctNew = $maxPct };
@@ -506,7 +508,7 @@ sub KLF200Node_SetLimitationUpdateInterval($$) {
   my ($hash, $interval) = @_;
   my $name = $hash->{NAME};
   
-  Log3($name, 5, "KLF200Node ($name) - set limitationUpdateInterval $interval");
+  Log3($hash, 5, "KLF200Node ($name) - set limitationUpdateInterval $interval");
   if (not defined($interval) or (not $interval =~ /^(off|onChange|\d+)$/)) {$interval = "off"};
   readingsSingleUpdate($hash, "limitationUpdateInterval", $interval, 1);
   KLF200Node_UpdateLimitation($hash);
@@ -516,7 +518,7 @@ sub KLF200Node_SetStatusUpdateInterval($$) {
   my ($hash, $interval) = @_;
   my $name = $hash->{NAME};
   
-  Log3($name, 5, "KLF200Node ($name) - set statusUpdateInterval $interval");
+  Log3($hash, 5, "KLF200Node ($name) - set statusUpdateInterval $interval");
   if (not defined($interval) or (not $interval =~ /^(default|\d+)$/)) {$interval = "default"};
   readingsSingleUpdate($hash, "statusUpdateInterval", $interval, 1);
   KLF200Node_UpdateStatus($hash);
@@ -673,7 +675,8 @@ sub KLF200Node_GetHash($$) {
   my $hash = $modules{KLF200Node}{defptr}{$DeviceName}{$NodeID};
   if(!defined($hash)) { 
     my $io_name = $io_hash->{NAME};
-    my $undefined = "UNDEFINED ".$io_name."_".$NodeID." KLF200Node ".$DeviceName." ".$NodeID; 
+    my $undefined = "UNDEFINED ".$io_name."_".$NodeID." KLF200Node ".$DeviceName." ".$NodeID;
+    Log3($io_hash, 5, "KLF200Node ($io_name) Device not found, prepare auto create: $undefined"); 
     return (undef, $undefined); 
   };
   $hash->{IODev} = $io_hash;

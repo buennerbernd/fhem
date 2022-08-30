@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 36744 2022-21-06 06:47:59Z buennerbernd $
+# $Id: 83_KLF200.pm 36744 2022-30-08 11:30:06Z buennerbernd $
 #
 ##############################################################################
 
@@ -197,7 +197,7 @@ sub KLF200_Read($) {
   return if(!defined($bytes));
   
   my $hexString = unpack("H*", $bytes); 
-  Log3($name, 5, "KLF200 ($name) - received: $hexString"); 
+  Log3($hash, 5, "KLF200 ($name) - received: $hexString"); 
   
   my $command = substr($bytes, 0, 2);
   if    ($command eq "\x00\x0D") { KLF200_GW_GET_STATE_CFM($hash, $bytes) }
@@ -216,8 +216,8 @@ sub KLF200_Read($) {
   elsif ($command =~ /^(\x01\x02|\x02\x04|\x02\x10|\x02\x11|\x03\x02|\x03\x03|\x03\x07|\x03\x14)$/)
                                  { KLF200_DispatchToNode($hash, $bytes) }
   elsif ($command =~ /^(\x01\x01|\x02\x03|\x03\x06|\x03\x13|\x05\x06)$/)
-                                 { Log3($name, 5, "KLF200 ($name) - ignored:  $hexString") }
-  else                           { Log3($name, 1, "KLF200 ($name) - unknown:  $hexString") }     
+                                 { Log3($hash, 5, "KLF200 ($name) - ignored:  $hexString") }
+  else                           { Log3($hash, 1, "KLF200 ($name) - unknown:  $hexString") }     
 }
 
 # called if set command is executed
@@ -231,7 +231,7 @@ sub KLF200_Set($$$) {
   my $arg1 = shift @a;
   my $arg2 = shift @a;
   
-  Log3($name, 5, "KLF200 ($name) - Set $cmd") if ($cmd ne "?");
+  Log3($hash, 5, "KLF200 ($name) - Set $cmd") if ($cmd ne "?");
 
   if    ($cmd eq "scene")          { KLF200_GW_ACTIVATE_SCENE_REQ($hash, $hash->{".sceneToID"}->{$arg1}, $arg2) }
   elsif ($cmd eq "sceneID")        { KLF200_GW_ACTIVATE_SCENE_REQ($hash, $arg1, $arg2) }
@@ -263,7 +263,7 @@ sub KLF200_Callback($$) {
   my ($hash, $error) = @_;
   if(defined($error)) {
     my $name = $hash->{NAME};
-    Log3($name, 5, "KLF200 ($name) - error while connecting: $error"); 
+    Log3($hash, 5, "KLF200 ($name) - error while connecting: $error"); 
   }
   return undef; 
 }
@@ -421,7 +421,7 @@ sub KLF200_DispatchToNode($$) {
   my $name = $hash->{NAME};
   my $found = Dispatch($hash, $bytes);
   if (not defined($found)) {
-    Log3($name, 1, "KLF200 ($name) - new Node found, updateAll"); 
+    Log3($hash, 1, "KLF200 ($name) - new Node found, updateAll"); 
     RemoveInternalTimer($hash, "KLF200_UpdateAll");
     InternalTimer( gettimeofday() + 20, "KLF200_UpdateAll", $hash); #after auto create, update node again in 20 seconds
   };
@@ -474,12 +474,12 @@ sub KLF200_ReadPassword($) {
   my $index = $hash->{TYPE}."_".$hash->{Host}."_passwd";
   my $key = getUniqueId().$index;
   
-  Log3($name, 5, "KLF200 $name: Read password from file");
+  Log3($hash, 5, "KLF200 $name: Read password from file");
   
   my ($err, $password) = getKeyValue($index);
 
   if ( defined($err) ) {
-    Log3($name, 3, "KLF200 $name: unable to read password from file: $err");
+    Log3($hash, 3, "KLF200 $name: unable to read password from file: $err");
     return undef; 
   }
   
@@ -496,7 +496,7 @@ sub KLF200_ReadPassword($) {
     }
     return $dec_pwd;
   } else {
-    Log3($name, 3, "KLF200 $name: No password in file");
+    Log3($hash, 3, "KLF200 $name: No password in file");
     return undef;
   }
 }
@@ -543,7 +543,7 @@ sub KLF200_addControlName($$$) {
   my ($hash, $controlId, $controlName) = @_;
   my $name = $hash->{NAME};
   
-  Log3($name, 1, "KLF200 $name: addControlName $controlId:$controlName");
+  Log3($hash, 1, "KLF200 $name: addControlName $controlId:$controlName");
   my $controlNamesAttr = AttrVal($name, "controlNames", "");
   $controlNamesAttr .= "," if ($controlNamesAttr ne "");
   $controlNamesAttr .= $controlId.":".$controlName;
@@ -557,14 +557,14 @@ sub KLF200_connectionBroken($) {
   if (ReadingsVal($name, "connectionBroken", 0) == 1) { return; };
   
   DevIo_CloseDev($hash);
-  Log3($name, 1, "KLF200 ($name) - connectionBroken -> closed connection");
+  Log3($hash, 1, "KLF200 ($name) - connectionBroken -> closed connection");
   
   readingsBeginUpdate($hash);
   readingsBulkUpdateIfChanged($hash, "state", "Connection broken", 1);
   readingsBulkUpdateIfChanged($hash, "connectionBroken", 1, 1);
   readingsEndUpdate($hash, 1);
   
-  Log3($name, 1, "KLF200 ($name) - connectionBroken -> reopen connection in 5 seconds");
+  Log3($hash, 1, "KLF200 ($name) - connectionBroken -> reopen connection in 5 seconds");
   InternalTimer( gettimeofday() + 5, "KLF200_Ready", $hash); 
   return;
 }
@@ -930,7 +930,7 @@ sub KLF200_GW_REBOOT_CFM($$) {
   readingsBulkUpdate($hash, "state", "Reboot", 1);
   readingsBulkUpdate($hash, "connectionsAfterBoot", 0, 1);
   readingsEndUpdate($hash, 1);
-  Log3($name, 1, "KLF200 ($name) - reboot started, reconnect in 30 seconds");
+  Log3($hash, 1, "KLF200 ($name) - reboot started, reconnect in 30 seconds");
   
   KLF200_Dequeue($hash, qr/^\x00\x01/, undef); #GW_REBOOT_REQ
   return;  
@@ -945,7 +945,7 @@ sub KLF200_GW_ERROR_NTF($$) {
   my $lastError = KLF200_GetText($hash, "ErrorNumber", $ErrorNumber);
 
   readingsSingleUpdate($hash, "lastError", $lastError, 1);
-  Log3($name, 1, "KLF200 ($name) - Gateway Error: $lastError");
+  Log3($hash, 1, "KLF200 ($name) - Gateway Error: $lastError");
   if ($lastError ne "Busy. Try again later.") {
     KLF200_Dequeue($hash, undef, undef); #last request
   }
