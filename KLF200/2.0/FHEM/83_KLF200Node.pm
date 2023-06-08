@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 57990 2022-30-08 14:48:37Z buennerbernd $
+# $Id: 83_KLF200Node.pm 58184 2023-08-06 08:33:51Z buennerbernd $
 #
 ##############################################################################
 
@@ -682,7 +682,11 @@ sub KLF200Node_GetHash($$) {
   my ($io_hash, $NodeID) = @_;
   my $DeviceName = $io_hash->{DeviceName};
   my $hash = $modules{KLF200Node}{defptr}{$DeviceName}{$NodeID};
-  if(!defined($hash)) { 
+  if(!defined($hash)) {
+    #Handle only actuators, ignore beacons
+    if ($NodeID >= 200) { return (undef, undef) };
+    #Set flag to $io_hash to enable auto create post processing
+    $io_hash->{".NewNodeFound"} = 1;
     my $io_name = $io_hash->{NAME};
     my $undefined = "UNDEFINED ".$io_name."_".$NodeID." KLF200Node ".$DeviceName." ".$NodeID;
     Log3($io_hash, 5, "KLF200Node ($io_name) Device not found, prepare auto create: $undefined"); 

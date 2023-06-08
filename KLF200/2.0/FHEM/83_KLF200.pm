@@ -3,7 +3,7 @@
 # 83_KLF200.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200.pm 36744 2022-30-08 14:48:37Z buennerbernd $
+# $Id: 83_KLF200.pm 36786 2023-08-06 08:33:51Z buennerbernd $
 #
 ##############################################################################
 
@@ -419,8 +419,9 @@ sub KLF200_ClearQueue($) {
 sub KLF200_DispatchToNode($$) {
   my ($hash, $bytes) = @_;
   my $name = $hash->{NAME};
+  $hash->{".NewNodeFound"} = 0;
   my $found = Dispatch($hash, $bytes);
-  if (not defined($found)) {
+  if ($hash->{".NewNodeFound"} == 1) {
     Log3($hash, 1, "KLF200 ($name) - new Node found, updateAll"); 
     RemoveInternalTimer($hash, "KLF200_UpdateAll");
     InternalTimer( gettimeofday() + 20, "KLF200_UpdateAll", $hash); #after auto create, update node again in 20 seconds
