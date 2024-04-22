@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 58184 2023-08-06 08:33:51Z buennerbernd $
+# $Id: 83_KLF200Node.pm 58525 2024-22-04 11:26:58Z buennerbernd $
 #
 ##############################################################################
 
@@ -310,7 +310,7 @@ sub KLF200Node_Set($$$) {
     my $velocity = shift @a;
     return KLF200Node_SetState($hash, $value, $velocity);
   }
-  if ($cmd =~ /^([0-9]+|on|off|up|down|stop|my|securedVentilation)$/) {
+  if ($cmd =~ /^([0-9]+|on|off|up|down|stop|my|securedVentilation|openRain|openPedestrian)$/) {
     my $velocity = shift @a;
     return KLF200Node_SetState($hash, $cmd, $velocity);
   }
@@ -369,7 +369,9 @@ sub KLF200Node_Set($$$) {
   
   my $usage= " on:noArg off:noArg toggle:noArg up:noArg down:noArg stop:noArg" ;
   $usage .= " my:noArg" if (ReadingsVal($name, "ioManufacturer", "") eq "Somfy");
+  $usage .= " openPedestrian:noArg" if (ReadingsVal($name, "nodeTypeSubType", "") eq "Gate opener" );
   $usage .= " securedVentilation:noArg" if (ReadingsVal($name, "nodeTypeSubType", "") =~ /^Window opener/ );
+  $usage .= " openRain:noArg" if (ReadingsVal($name, "nodeTypeSubType", "") =~ /^Window opener/ );
   $usage .= " pct:slider,0,1,100" ;
   $usage .= " execution:up,down,stop" ;
   $usage .= " raw" ;
@@ -433,6 +435,8 @@ sub KLF200Node_SetState($$$) {
   elsif ($state eq "target")             { $MP = 0xD100 }
   elsif ($state eq "my")                 { $MP = 0xD800 }
   elsif ($state eq "securedVentilation") { $MP = 0xD803 }
+  elsif ($state eq "openPedestrian")     { $MP = 0xD807 }
+  elsif ($state eq "openRain")           { $MP = 0xD814 }
   elsif ($state eq "on")                 { $MP = KLF200Node_PctToRaw($hash, 100) }
   elsif ($state eq "off")                { $MP = KLF200Node_PctToRaw($hash, 0) }
   else                                   { $MP = KLF200Node_PctToRaw($hash, $state) }
