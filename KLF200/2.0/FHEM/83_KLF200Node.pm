@@ -366,6 +366,11 @@ sub KLF200Node_Set($$$) {
     my $interval = shift @a; 
     return KLF200Node_SetLimitationUpdateInterval($hash, $interval);
   }
+
+  if ($cmd eq "slatsAngle") {
+    my $slatsAngle = shift @a;
+    return KLF200Node_SetSlatsAngle($hash, $slatsAngle);
+  }
   
   my $usage= " on:noArg off:noArg toggle:noArg up:noArg down:noArg stop:noArg" ;
   $usage .= " my:noArg" if (ReadingsVal($name, "ioManufacturer", "") eq "Somfy");
@@ -383,7 +388,8 @@ sub KLF200Node_Set($$$) {
   $usage .= " limitationClear:noArg" ;
   $usage .= " limitationMin:slider,0,1,100" ;
   $usage .= " limitationMax:slider,0,1,100" ;  
-  $usage .= " limitationUpdateInterval" ;  
+  $usage .= " limitationUpdateInterval" ; 
+  $usage .= " slatsAngle:slider,0,1,90 if (ReadingsVal($name, 'nodeTypeSubType', '') eq 'Exterior Venetian blind')"; 
 #  $usage .= " target:noArg" ;
 
   return SetExtensions($hash, $usage, $name, $cmd, @a);
@@ -466,6 +472,17 @@ sub KLF200Node_SetRaw($$) {
     push(@a, $paramValue);
   }
   return KLF200Node_GW_COMMAND_SEND_REQ($hash, $ParameterActive, \@a); 
+}
+
+sub KLF200Node_SetSlatsAngle($$) {
+  use List::Util qw(min max);
+  my ($hash, $slatsAngle) = @_;
+  my $name = $hash->{NAME};
+  $slatsAngle = max(0, min(90, $slatsAngle));
+  my $slatsAngleRaw = int($slatsAngle * 51200 / 90);
+  my @a = (undef, undef, undef, $slatsAngleRaw);
+
+  return KLF200Node_GW_COMMAND_SEND_REQ($hash, 3, \@a); 
 }
 
 sub KLF200Node_SetLimitation($$$) {
@@ -808,7 +825,7 @@ sub KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($$) {
   my ($changed, $targetArrival) = KLF200Node_BulkUpdateMain($hash, $CurrentPosition, $Target, $RemainingTime, $State);
   KLF200Node_BulkUpdateFP($hash, 1, $FP1CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 2, $FP2CurrentPosition);
-#  KLF200Node_BulkUpdateFP($hash, 3, $FP3CurrentPosition); #For Somfy Exterior Venetian blind Type 17 this only returns buggy results
+  # KLF200Node_BulkUpdateFP($hash, 3, $FP3CurrentPosition); #For Somfy Exterior Venetian blind Type 17 this only returns buggy results
   KLF200Node_BulkUpdateFP($hash, 4, $FP4CurrentPosition);
   readingsEndUpdate($hash, 1);
   my $statusUpdateInterval = ReadingsVal($name, "statusUpdateInterval", "default");
@@ -1430,6 +1447,12 @@ sub KLF200Node_GW_SET_LIMITATION_REQ($$$$) {
       Refresh the value of the Main Parameter (MP) and the used Functional Parameters (FP1 - FP7) from the device.<br>
       If you are not using the Functional Parameters (FP1 - FP7) prefer set updateStatus.
       <br>
+    </li>
+    <a name="slatsAngle"></a>
+    <li>
+      <code>set &lt;name&gt; slatsAngle &lt;0 - 90&gt;</code><br>
+      <br>
+      Set the angle of the slats of a blind for "Exterior Venetian blind" (17)<br>
     </li>
   </ul><br>
   <a name="KLF200Nodeattr"></a>
