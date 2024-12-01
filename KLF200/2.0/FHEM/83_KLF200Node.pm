@@ -388,7 +388,7 @@ sub KLF200Node_Set($$$) {
   $usage .= " limitationClear:noArg" ;
   $usage .= " limitationMin:slider,0,1,100" ;
   $usage .= " limitationMax:slider,0,1,100" ;  
-  $usage .= " limitationUpdateInterval" ; 
+  $usage .= " limitationUpdateInterval" ;  
   $usage .= " slatsAngle:slider,0,1,90 if (ReadingsVal($name, 'nodeTypeSubType', '') eq 'Exterior Venetian blind')"; 
 #  $usage .= " target:noArg" ;
 
@@ -825,7 +825,7 @@ sub KLF200Node_GW_NODE_STATE_POSITION_CHANGED_NTF($$) {
   my ($changed, $targetArrival) = KLF200Node_BulkUpdateMain($hash, $CurrentPosition, $Target, $RemainingTime, $State);
   KLF200Node_BulkUpdateFP($hash, 1, $FP1CurrentPosition);
   KLF200Node_BulkUpdateFP($hash, 2, $FP2CurrentPosition);
-  # KLF200Node_BulkUpdateFP($hash, 3, $FP3CurrentPosition); #For Somfy Exterior Venetian blind Type 17 this only returns buggy results
+# KLF200Node_BulkUpdateFP($hash, 3, $FP3CurrentPosition); #For Somfy Exterior Venetian blind Type 17 this only returns buggy results
   KLF200Node_BulkUpdateFP($hash, 4, $FP4CurrentPosition);
   readingsEndUpdate($hash, 1);
   my $statusUpdateInterval = ReadingsVal($name, "statusUpdateInterval", "default");
