@@ -367,9 +367,9 @@ sub KLF200Node_Set($$$) {
     return KLF200Node_SetLimitationUpdateInterval($hash, $interval);
   }
 
-  if ($cmd eq "slatsAngle") {
-    my $slatsAngle = shift @a;
-    return KLF200Node_SetSlatsAngle($hash, $slatsAngle);
+  if ($cmd eq "slatsPosition") {
+    my $slatsPosition = shift @a;
+    return KLF200Node_SetslatsPosition($hash, $slatsPosition);
   }
   
   my $usage= " on:noArg off:noArg toggle:noArg up:noArg down:noArg stop:noArg" ;
@@ -389,7 +389,7 @@ sub KLF200Node_Set($$$) {
   $usage .= " limitationMin:slider,0,1,100" ;
   $usage .= " limitationMax:slider,0,1,100" ;  
   $usage .= " limitationUpdateInterval" ;  
-  $usage .= " slatsAngle:slider,0,1,90 if (ReadingsVal($name, 'nodeTypeSubType', '') eq 'Exterior Venetian blind')"; 
+  $usage .= " slatsPosition:slider,0,1,100 if (ReadingsVal($name, 'nodeTypeSubType', '') eq 'Exterior Venetian blind')"; 
 #  $usage .= " target:noArg" ;
 
   return SetExtensions($hash, $usage, $name, $cmd, @a);
@@ -474,13 +474,13 @@ sub KLF200Node_SetRaw($$) {
   return KLF200Node_GW_COMMAND_SEND_REQ($hash, $ParameterActive, \@a); 
 }
 
-sub KLF200Node_SetSlatsAngle($$) {
+sub KLF200Node_SetslatsPosition($$) {
   use List::Util qw(min max);
-  my ($hash, $slatsAngle) = @_;
+  my ($hash, $slatsPosition) = @_;
   my $name = $hash->{NAME};
-  $slatsAngle = max(0, min(90, $slatsAngle));
-  my $slatsAngleRaw = int($slatsAngle * 51200 / 90);
-  my @a = (undef, undef, undef, $slatsAngleRaw);
+  $slatsPosition = max(0, min(100, $slatsPosition));
+  my $slatsPositionRaw = int($slatsPosition * 51200 / 100);
+  my @a = (undef, undef, undef, $slatsPositionRaw);
 
   return KLF200Node_GW_COMMAND_SEND_REQ($hash, 3, \@a); 
 }
@@ -1448,11 +1448,11 @@ sub KLF200Node_GW_SET_LIMITATION_REQ($$$$) {
       If you are not using the Functional Parameters (FP1 - FP7) prefer set updateStatus.
       <br>
     </li>
-    <a name="slatsAngle"></a>
+    <a name="slatsPosition"></a>
     <li>
-      <code>set &lt;name&gt; slatsAngle &lt;0 - 90&gt;</code><br>
+      <code>set &lt;name&gt; slatsPosition &lt;0 - 100&gt;</code><br>
       <br>
-      Set the angle of the slats of a blind for "Exterior Venetian blind" (17)<br>
+      Set the position of the slats of a blind for "Exterior Venetian blind" (17)<br>
     </li>
   </ul><br>
   <a name="KLF200Nodeattr"></a>
