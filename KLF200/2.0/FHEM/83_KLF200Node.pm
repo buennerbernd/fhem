@@ -3,7 +3,7 @@
 # 83_KLF200Node.pm
 # Copyright by Stefan Bünnig buennerbernd
 #
-# $Id: 83_KLF200Node.pm 58525 2024-22-04 11:26:58Z buennerbernd $
+# $Id: 83_KLF200Node.pm 59448 2024-04-12 15:03:58Z buennerbernd $
 #
 ##############################################################################
 
@@ -234,6 +234,7 @@ sub KLF200Node_InitTexts($) {
     5 => "UPS",
     8 => "SAAC",
     9 => "WIND",
+    10 => "OTHER_DEVICE", #This is not mentioned in the documentation, but was observed by a user
     11 => "LOAD_SHEDDING",
     12 => "LOCAL_LIGHT",
     13 => "UNSPECIFIC_ENVIRONMENT_SENSOR",
@@ -369,7 +370,7 @@ sub KLF200Node_Set($$$) {
 
   if ($cmd eq "slatsPosition") {
     my $slatsPosition = shift @a;
-    return KLF200Node_SetslatsPosition($hash, $slatsPosition);
+    return KLF200Node_SetSlatsPosition($hash, $slatsPosition);
   }
   
   my $usage= " on:noArg off:noArg toggle:noArg up:noArg down:noArg stop:noArg" ;
@@ -474,12 +475,12 @@ sub KLF200Node_SetRaw($$) {
   return KLF200Node_GW_COMMAND_SEND_REQ($hash, $ParameterActive, \@a); 
 }
 
-sub KLF200Node_SetslatsPosition($$) {
+sub KLF200Node_SetSlatsPosition($$) {
   use List::Util qw(min max);
   my ($hash, $slatsPosition) = @_;
   my $name = $hash->{NAME};
   $slatsPosition = max(0, min(100, $slatsPosition));
-  my $slatsPositionRaw = int($slatsPosition * 51200 / 100);
+  my $slatsPositionRaw = int($slatsPosition * 512);
   my @a = (undef, undef, undef, $slatsPositionRaw);
 
   return KLF200Node_GW_COMMAND_SEND_REQ($hash, 3, \@a); 
