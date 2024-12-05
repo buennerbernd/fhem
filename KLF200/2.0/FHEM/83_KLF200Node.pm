@@ -390,7 +390,7 @@ sub KLF200Node_Set($$$) {
   $usage .= " limitationMin:slider,0,1,100" ;
   $usage .= " limitationMax:slider,0,1,100" ;  
   $usage .= " limitationUpdateInterval" ;  
-  $usage .= " slatsPosition:slider,0,1,100 if (ReadingsVal($name, 'nodeTypeSubType', '') eq 'Exterior Venetian blind')"; 
+  $usage .= " slatsPosition:slider,0,1,100" if (ReadingsVal($name, 'nodeTypeSubType', '') eq 'Exterior Venetian blind'); 
 #  $usage .= " target:noArg" ;
 
   return SetExtensions($hash, $usage, $name, $cmd, @a);
